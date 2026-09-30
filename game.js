@@ -1,1673 +1,1133 @@
 /**
- * MATH RUNNER - Standard 3 Mathematics Arcade Game
- * Game 1 of 6-game collection
- * 
- * Features:
- * - 3-Lane 2.5D Canvas Runner Engine
- * - Addition & Subtraction up to 1,000 (10 Editable Challenges)
- * - Autonomous Web Audio API Synthesizer with MP3 fallback
- * - Desktop & Mobile Touch Controls (Keyboard, Swipe, On-Screen Buttons)
- * - 3-Star Rating System & Animated HUD
+ * GAME 4: MATH RUNNER — 3-LANE ATHLETIC SPRINT ENGINE
+ * Standard 3 Mathematics: Addition, Subtraction & Operations up to 1,000
+ * Retro Arcade + Modern Cartoon Visual Style (100% Emoji Free)
+ * StuCent Sandboxed Runtime Compatible
  */
 
 (() => {
   'use strict';
 
+  const doc = typeof root !== 'undefined' ? root : document;
+  const gameCtx = typeof game !== 'undefined' ? game : (window.game || null);
+
   // ==========================================================================
-  // 1. EDITABLE MATHEMATICS CHALLENGES (Standard 3: Addition & Subtraction <= 1000)
+  // 1. ARCADE SOUND & ATHLETIC PROCEDURAL BGM SYNTHESIZER
+  // ==========================================================================
+  let audioCtx = null;
+  let isMuted = localStorage.getItem('math_games_sound') === 'false';
+  let bgmMasterGain = null;
+  let bgmInterval = null;
+  let bgmStep = 0;
+
+  function initAudio() {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+        bgmMasterGain = audioCtx.createGain();
+        bgmMasterGain.gain.setValueAtTime(isMuted ? 0 : 0.045, audioCtx.currentTime);
+        bgmMasterGain.connect(audioCtx.destination);
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function startRunnerBGM() {
+    initAudio();
+    if (!audioCtx || bgmInterval) return;
+
+    // Upbeat Athletic Funk / Chiptune (128 BPM) in D Dorian
+    const bassline = [
+      146.83, 0, 146.83, 174.61,  220.00, 0, 146.83, 0,
+      196.00, 0, 196.00, 246.94,  220.00, 0, 174.61, 0,
+      146.83, 0, 146.83, 174.61,  246.94, 0, 220.00, 0,
+      164.81, 0, 174.61, 0,       196.00, 0, 293.66, 0
+    ];
+
+    const leadNotes = [
+      587.33, 739.99, 880.00, 1174.66, 880.00, 739.99, 587.33, 739.99,
+      783.99, 987.77, 1174.66, 987.77, 880.00, 739.99, 659.25, 587.33,
+      587.33, 739.99, 880.00, 1174.66, 987.77, 880.00, 739.99, 880.00,
+      659.25, 739.99, 880.00, 987.77,  1174.66, 1318.51, 1174.66, 880.00
+    ];
+
+    const stepDuration = (60 / 128) / 4;
+    bgmStep = 0;
+
+    bgmInterval = setInterval(() => {
+      if (isMuted || !audioCtx || !isPlaying || isGameOver) return;
+      const t = audioCtx.currentTime;
+      const idx = bgmStep % 32;
+
+      // Bass note
+      const bFreq = bassline[idx];
+      if (bFreq > 0) {
+        try {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(bFreq, t);
+          gain.gain.setValueAtTime(0.06, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + stepDuration * 1.6);
+          osc.connect(gain);
+          gain.connect(bgmMasterGain);
+          osc.start(t);
+          osc.stop(t + stepDuration * 1.7);
+        } catch (e) {}
+      }
+
+      // Melody tick
+      if (idx % 2 === 0) {
+        const lFreq = leadNotes[idx];
+        if (lFreq > 0) {
+          try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(lFreq, t);
+            gain.gain.setValueAtTime(0.03, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + stepDuration * 1.3);
+            osc.connect(gain);
+            gain.connect(bgmMasterGain);
+            osc.start(t);
+            osc.stop(t + stepDuration * 1.4);
+          } catch (e) {}
+        }
+      }
+
+      bgmStep++;
+    }, stepDuration * 1000);
+  }
+
+  function stopRunnerBGM() {
+    if (bgmInterval) {
+      clearInterval(bgmInterval);
+      bgmInterval = null;
+    }
+  }
+
+  function beep(freq, durationMs, type = 'sine', vol = 0.15, delaySec = 0) {
+    if (isMuted) return;
+    initAudio();
+    if (!audioCtx) return;
+
+    try {
+      const t = audioCtx.currentTime + delaySec;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(vol, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + durationMs / 1000);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + durationMs / 1000);
+    } catch (e) {}
+  }
+
+  function playCollectSound(comboMult = 1) {
+    const base = 520 + comboMult * 50;
+    beep(base, 70, 'sine', 0.22);
+    beep(base * 1.33, 90, 'sine', 0.18, 0.04);
+  }
+
+  function playJumpSound() {
+    beep(380, 80, 'triangle', 0.18);
+    beep(580, 110, 'sine', 0.14, 0.03);
+  }
+
+  function playHurdleHitSound() {
+    beep(160, 280, 'sawtooth', 0.3);
+    beep(110, 280, 'square', 0.24, 0.06);
+    triggerScreenShake(10, 14);
+  }
+
+  function playCorrectFanfare() {
+    [523.25, 659.25, 783.99, 1046.50, 1318.5].forEach((f, i) => {
+      beep(f, 180, 'sine', 0.18, i * 0.07);
+    });
+  }
+
+  function playWrongBuzz() {
+    beep(180, 240, 'sawtooth', 0.28);
+    beep(130, 260, 'square', 0.22, 0.05);
+    triggerScreenShake(8, 12);
+  }
+
+  let screenShakeIntensity = 0;
+
+  function triggerScreenShake(intensity = 10, frames = 15) {
+    screenShakeIntensity = intensity;
+  }
+
+  // ==========================================================================
+  // 2. 10 EDITABLE MATHEMATICS CHALLENGES (STANDARD 3 CURRICULUM)
   // ==========================================================================
   const MATH_CHALLENGES = [
     {
       id: 1,
-      question: "320 + 150 = ?",
+      badge: 'STAGE 01 • ADDITION',
+      question: '320 + 150 = ?',
       answer: 470,
       options: [470, 370, 450],
-      hint: "Add hundreds first: 300+100=400, then tens: 20+50=70"
+      tip: 'Add hundreds first (300+100=400), then tens (20+50=70) = 470.',
+      explain: '320 + 150: 300+100=400 and 20+50=70, total is 470.'
     },
     {
       id: 2,
-      question: "580 - 240 = ?",
+      badge: 'STAGE 02 • SUBTRACTION',
+      question: '580 - 240 = ?',
       answer: 340,
       options: [320, 340, 440],
-      hint: "500 - 200 = 300, 80 - 40 = 40"
+      tip: 'Subtract hundreds (500-200=300), then tens (80-40=40) = 340.',
+      explain: '580 - 240: 500-200=300 and 80-40=40, result is 340.'
     },
     {
       id: 3,
-      question: "415 + 230 = ?",
+      badge: 'STAGE 03 • ADDITION',
+      question: '415 + 230 = ?',
       answer: 645,
       options: [635, 655, 645],
-      hint: "400+200=600, 15+30=45"
+      tip: '400+200=600 and 15+30=45 -> 645.',
+      explain: '415 + 230: 400+200=600, 15+30=45, total is 645.'
     },
     {
       id: 4,
-      question: "760 - 320 = ?",
+      badge: 'STAGE 04 • SUBTRACTION',
+      question: '760 - 320 = ?',
       answer: 440,
       options: [440, 540, 420],
-      hint: "700 - 300 = 400, 60 - 20 = 40"
+      tip: '700 - 300 = 400, 60 - 20 = 40 -> 440.',
+      explain: '760 - 320: 700-300=400, 60-20=40, result is 440.'
     },
     {
       id: 5,
-      question: "248 + 316 = ?",
+      badge: 'STAGE 05 • REGROUPING ADDITION',
+      question: '248 + 316 = ?',
       answer: 564,
       options: [554, 564, 574],
-      hint: "248 + 300 = 548, 548 + 16 = 564"
+      tip: '248 + 300 = 548; 548 + 16 = 564.',
+      explain: '248 + 316: 200+300=500, 48+16=64, total is 564.'
     },
     {
       id: 6,
-      question: "650 - 275 = ?",
+      badge: 'STAGE 06 • REGROUPING SUBTRACTION',
+      question: '650 - 275 = ?',
       answer: 375,
       options: [475, 385, 375],
-      hint: "650 - 200 = 450, 450 - 75 = 375"
+      tip: '650 - 200 = 450; 450 - 75 = 375.',
+      explain: '650 - 275: 650 - 250 = 400, 400 - 25 = 375.'
     },
     {
       id: 7,
-      question: "520 + 380 = ?",
-      answer: 900,
-      options: [900, 890, 910],
-      hint: "520 + 380 = 500 + 300 + 100 = 900"
+      badge: 'STAGE 07 • MULTIPLICATION',
+      question: '45 × 4 = ?',
+      answer: 180,
+      options: [160, 180, 200],
+      tip: '40 × 4 = 160; 5 × 4 = 20 -> 160 + 20 = 180.',
+      explain: '45 × 4 = (40 × 4) + (5 × 4) = 160 + 20 = 180.'
     },
     {
       id: 8,
-      question: "830 - 450 = ?",
+      badge: 'STAGE 08 • SUBTRACTION',
+      question: '830 - 450 = ?',
       answer: 380,
       options: [480, 380, 390],
-      hint: "830 - 400 = 430, 430 - 50 = 380"
+      tip: '830 - 400 = 430; 430 - 50 = 380.',
+      explain: '830 - 450: 830 - 430 = 400, 400 - 20 = 380.'
     },
     {
       id: 9,
-      question: "465 + 372 = ?",
-      answer: 837,
-      options: [827, 837, 847],
-      hint: "400+300=700, 65+72=137, 700+137=837"
+      badge: 'STAGE 09 • MULTIPLICATION',
+      question: '125 × 3 = ?',
+      answer: 375,
+      options: [325, 375, 395],
+      tip: '100 × 3 = 300; 25 × 3 = 75 -> 375.',
+      explain: '125 × 3 = (100 × 3) + (25 × 3) = 300 + 75 = 375.'
     },
     {
       id: 10,
-      question: "1000 - 365 = ?",
+      badge: 'STAGE 10 • GRAND FINALE',
+      question: '1000 - 365 = ?',
       answer: 635,
       options: [735, 645, 635],
-      hint: "1000 - 300 = 700, 700 - 65 = 635"
+      tip: '1000 - 300 = 700; 700 - 65 = 635.',
+      explain: '1000 - 365: 1000 - 300 = 700, 700 - 65 = 635.'
     }
   ];
 
   // ==========================================================================
-  // 2. AUDIO MANAGER (With Procedural Web Audio Synth Fallback)
+  // 3. GAME STATE & RUNNER VARIABLES
   // ==========================================================================
-  class AudioManager {
-    constructor() {
-      const pref = localStorage.getItem('math_games_sound') ?? localStorage.getItem('math_runner_sound');
-      this.soundEnabled = pref !== 'false';
-      this.ctx = null;
-      this.bgmTimer = null;
-      this.bgmStep = 0;
-      this.audioFiles = {};
-      this.audioLoaded = {};
+  let currentStageIdx = 0;
+  let score = 0;
+  let lives = 3;
+  let combo = 1;
+  let bestCombo = 1;
+  let totalStagesCleared = 0;
+  let totalAttempts = 0;
+  let timeRemaining = 90;
+  let gameTimerInterval = null;
+  let gameStartTime = 0;
+  let isPlaying = false;
+  let isGameOver = false;
 
-      this.initAudioFiles();
-    }
+  let currentLane = 1; // 0: Left, 1: Center, 2: Right
+  let targetRunnerX = 400;
 
-    initAudioContext() {
-      if (!this.ctx) {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) {
-          this.ctx = new AudioContextClass();
+  const runner = {
+    x: 400,
+    y: 440,
+    width: 44,
+    height: 64,
+    isJumping: false,
+    jumpY: 0,
+    jumpVy: 0,
+    stumbleTimer: 0,
+    runAnimFrame: 0
+  };
+
+  // Active Gate Row: approaching 3-lane choice tokens
+  let activeGate = null;
+  let obstacles = [];
+  let particles = [];
+  let floatingTexts = [];
+  let trackScrollOffset = 0;
+
+  const canvas = doc.getElementById('game-canvas');
+  const ctx = canvas.getContext('2d');
+  let animationFrameId = null;
+
+  // ==========================================================================
+  // 4. SCREEN & HUD MANAGEMENT
+  // ==========================================================================
+  function setScreen(screenId) {
+    const screens = ['start-screen', 'countdown-screen', 'instructions-modal', 'game-over-screen'];
+    screens.forEach(id => {
+      const el = doc.getElementById(id);
+      if (el) {
+        if (id === screenId) {
+          el.classList.remove('hidden');
+          el.classList.add('active');
+        } else {
+          el.classList.add('hidden');
+          el.classList.remove('active');
         }
       }
-      if (this.ctx && this.ctx.state === 'suspended') {
-        this.ctx.resume();
+    });
+  }
+
+  function updateHUD() {
+    const scoreEl = doc.getElementById('score-display');
+    const timerEl = doc.getElementById('timer-display');
+    const roundEl = doc.getElementById('round-display');
+    const comboEl = doc.getElementById('combo-display');
+
+    if (scoreEl) scoreEl.textContent = String(score).padStart(6, '0');
+    if (timerEl) timerEl.textContent = String(Math.max(0, timeRemaining)).padStart(3, '0');
+    if (roundEl) roundEl.textContent = `${String(currentStageIdx + 1).padStart(2, '0')} / 10`;
+    if (comboEl) comboEl.textContent = `${combo}x`;
+
+    const heartsContainer = doc.getElementById('lives-container');
+    if (heartsContainer) {
+      let heartsHtml = '';
+      for (let i = 0; i < 3; i++) {
+        const isFull = i < lives;
+        heartsHtml += `<span class="arcade-heart ${isFull ? 'heart-full' : 'heart-empty'}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>`;
       }
+      heartsContainer.innerHTML = heartsHtml;
     }
+  }
 
-    initAudioFiles() {
-      const files = {
-        bgm: 'assets/music/background.mp3',
-        correct: 'assets/sounds/correct.mp3',
-        wrong: 'assets/sounds/wrong.mp3',
-        gameover: 'assets/sounds/gameover.mp3'
-      };
+  function updateBillboard() {
+    const challenge = MATH_CHALLENGES[currentStageIdx];
+    if (!challenge) return;
 
-      Object.keys(files).forEach(key => {
-        try {
-          const audio = new Audio();
-          audio.src = files[key];
-          audio.preload = 'auto';
-          if (key === 'bgm') audio.loop = true;
-          
-          audio.addEventListener('canplaythrough', () => {
-            this.audioLoaded[key] = true;
-          });
-          audio.addEventListener('error', () => {
-            this.audioLoaded[key] = false; // Graceful fallback
-          });
-          this.audioFiles[key] = audio;
-        } catch (e) {
-          this.audioLoaded[key] = false;
-        }
+    const badgeEl = doc.getElementById('question-badge');
+    const promptEl = doc.getElementById('question-prompt');
+    const tipEl = doc.getElementById('question-tip');
+
+    if (badgeEl) badgeEl.textContent = challenge.badge;
+    if (promptEl) promptEl.textContent = challenge.question;
+    if (tipEl) tipEl.textContent = challenge.tip;
+
+    updateHUD();
+  }
+
+  function showHint(text) {
+    const hintBanner = doc.getElementById('hint-banner');
+    const hintText = doc.getElementById('hint-text');
+    if (hintBanner && hintText) {
+      hintText.textContent = text;
+      hintBanner.classList.remove('hidden');
+      setTimeout(() => {
+        hintBanner.classList.add('hidden');
+      }, 4200);
+    }
+  }
+
+  // ==========================================================================
+  // 5. RUNNER TRACK LANE COORDINATES & MOVEMENT
+  // ==========================================================================
+  function getLaneCenterX(laneIdx) {
+    const roadLeft = canvas.width * 0.18;
+    const roadWidth = canvas.width * 0.64;
+    const laneWidth = roadWidth / 3;
+    return roadLeft + laneWidth * (laneIdx + 0.5);
+  }
+
+  function switchLane(laneIdx) {
+    if (!isPlaying || isGameOver) return;
+    currentLane = Math.max(0, Math.min(2, laneIdx));
+    targetRunnerX = getLaneCenterX(currentLane);
+    beep(450, 40, 'triangle', 0.08);
+
+    for (let i = 0; i < 4; i++) {
+      particles.push({
+        x: runner.x + (Math.random() - 0.5) * 16,
+        y: runner.y + 16,
+        vx: (Math.random() - 0.5) * 2,
+        vy: -0.5 - Math.random() * 1.5,
+        radius: 4 + Math.random() * 4,
+        color: '#e2e8f0',
+        alpha: 0.7,
+        life: 25
       });
     }
+  }
 
-    toggleSound() {
-      this.soundEnabled = !this.soundEnabled;
-      if (window.NumberlandFeedback) {
-        window.NumberlandFeedback.setSoundEnabled(this.soundEnabled);
-      }
-      localStorage.setItem('math_games_sound', this.soundEnabled ? 'true' : 'false');
-      localStorage.setItem('math_runner_sound', this.soundEnabled ? 'true' : 'false');
-      if (!this.soundEnabled) {
-        this.stopBGM();
-      } else {
-        this.initAudioContext();
-        this.startBGM();
-      }
-      return this.soundEnabled;
-    }
+  function jump() {
+    if (!isPlaying || isGameOver || runner.isJumping) return;
+    runner.isJumping = true;
+    runner.jumpVy = -13.5;
+    playJumpSound();
 
-    startBGM() {
-      if (!this.soundEnabled) return;
-      this.initAudioContext();
-
-      // If MP3 loaded and ready
-      if (this.audioLoaded.bgm && this.audioFiles.bgm) {
-        this.audioFiles.bgm.play().catch(() => {
-          this.startProceduralBGM();
-        });
-      } else {
-        this.startProceduralBGM();
-      }
-    }
-
-    stopBGM() {
-      if (this.audioFiles.bgm) {
-        this.audioFiles.bgm.pause();
-        this.audioFiles.bgm.currentTime = 0;
-      }
-      if (this.bgmTimer) {
-        clearInterval(this.bgmTimer);
-        this.bgmTimer = null;
-      }
-    }
-
-    // High energy cheerful retro chiptune melody
-    startProceduralBGM() {
-      if (!this.soundEnabled || this.bgmTimer || !this.ctx) return;
-
-      const melody = [
-        261.63, 329.63, 392.00, 523.25, 392.00, 329.63,
-        293.66, 369.99, 440.00, 587.33, 440.00, 369.99,
-        329.63, 392.00, 493.88, 659.25, 493.88, 392.00,
-        392.00, 329.63, 293.66, 261.63, 293.66, 329.63
-      ];
-      const bass = [130.81, 130.81, 146.83, 146.83, 164.81, 164.81, 196.00, 196.00];
-
-      this.bgmStep = 0;
-      this.bgmTimer = setInterval(() => {
-        if (!this.soundEnabled || !this.ctx) return;
-        const now = this.ctx.currentTime;
-
-        // Play melody note
-        const noteFreq = melody[this.bgmStep % melody.length];
-        this.playTone(noteFreq, 'square', 0.12, 0.04, now);
-
-        // Play bass note
-        if (this.bgmStep % 3 === 0) {
-          const bassFreq = bass[Math.floor(this.bgmStep / 3) % bass.length];
-          this.playTone(bassFreq, 'triangle', 0.2, 0.08, now);
-        }
-
-        this.bgmStep++;
-      }, 160);
-    }
-
-    playTone(freq, type = 'sine', duration = 0.15, volume = 0.1, startTime = null) {
-      if (!this.soundEnabled) return;
-      this.initAudioContext();
-      if (!this.ctx) return;
-
-      const start = startTime || this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, start);
-
-      gain.gain.setValueAtTime(volume, start);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(start);
-      osc.stop(start + duration);
-    }
-
-    playLaneSwitch() {
-      if (!this.soundEnabled) return;
-      this.playTone(480, 'sine', 0.08, 0.07);
-    }
-
-    playCorrect() {
-      if (!this.soundEnabled) return;
-      if (this.audioLoaded.correct && this.audioFiles.correct) {
-        this.audioFiles.correct.currentTime = 0;
-        this.audioFiles.correct.play().catch(() => this.synthCorrect());
-      } else {
-        this.synthCorrect();
-      }
-    }
-
-    synthCorrect() {
-      this.initAudioContext();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 - E5 - G5 - C6
-      notes.forEach((freq, idx) => {
-        this.playTone(freq, 'triangle', 0.18, 0.12, now + idx * 0.06);
-      });
-    }
-
-    playWrong() {
-      if (!this.soundEnabled) return;
-      if (this.audioLoaded.wrong && this.audioFiles.wrong) {
-        this.audioFiles.wrong.currentTime = 0;
-        this.audioFiles.wrong.play().catch(() => this.synthWrong());
-      } else {
-        this.synthWrong();
-      }
-    }
-
-    synthWrong() {
-      this.initAudioContext();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(220, now);
-      osc.frequency.exponentialRampToValueAtTime(80, now + 0.35);
-
-      gain.gain.setValueAtTime(0.18, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.35);
-    }
-
-    playGameOver() {
-      if (!this.soundEnabled) return;
-      if (this.audioLoaded.gameover && this.audioFiles.gameover) {
-        this.audioFiles.gameover.currentTime = 0;
-        this.audioFiles.gameover.play().catch(() => this.synthGameOver());
-      } else {
-        this.synthGameOver();
-      }
-    }
-
-    synthGameOver() {
-      this.initAudioContext();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const notes = [392.00, 369.99, 329.63, 293.66, 261.63];
-      notes.forEach((freq, idx) => {
-        this.playTone(freq, 'sawtooth', 0.25, 0.12, now + idx * 0.12);
-      });
-    }
-
-    playVictory() {
-      if (!this.soundEnabled) return;
-      this.initAudioContext();
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      const fanfare = [523.25, 659.25, 783.99, 1046.50, 1318.51];
-      fanfare.forEach((freq, idx) => {
-        this.playTone(freq, 'triangle', 0.3, 0.14, now + idx * 0.09);
+    for (let i = 0; i < 8; i++) {
+      particles.push({
+        x: runner.x + (Math.random() - 0.5) * 24,
+        y: runner.y + 18,
+        vx: (Math.random() - 0.5) * 3,
+        vy: -0.8 - Math.random() * 2,
+        radius: 5 + Math.random() * 5,
+        color: '#cbd5e1',
+        alpha: 0.8,
+        life: 28
       });
     }
   }
 
   // ==========================================================================
-  // 3. MAIN GAME ENGINE
+  // 6. SPAWNING GATES & HURDLES
   // ==========================================================================
-  class MathRunnerGame {
-    constructor() {
-      // DOM Elements
-      this.canvas = document.getElementById('game-canvas');
-      this.ctx = this.canvas.getContext('2d');
-      this.container = document.getElementById('game-container');
+  function spawnGate() {
+    const challenge = MATH_CHALLENGES[currentStageIdx];
+    if (!challenge) return;
 
-      // HUD Elements
-      this.scoreEl = document.getElementById('score-display');
-      this.timerEl = document.getElementById('timer-display');
-      this.challengeEl = document.getElementById('challenge-display');
-      this.livesContainer = document.getElementById('lives-container');
-      this.questionBillboard = document.getElementById('question-billboard');
-      this.questionTextEl = document.getElementById('question-text');
-      this.soundToggleBtn = document.getElementById('sound-toggle-btn');
-      this.soundIcon = document.getElementById('sound-icon');
-      this.feedbackBanner = document.getElementById('feedback-banner');
+    // Shuffle options across the 3 lanes
+    const shuffled = [...challenge.options].sort(() => Math.random() - 0.5);
 
-      // Screens & Modals
-      this.startScreen = document.getElementById('start-screen');
-      this.instructionsModal = document.getElementById('instructions-modal');
-      this.endScreen = document.getElementById('end-screen');
-      this.startSoundToggle = document.getElementById('start-sound-toggle');
-      this.startSoundIcon = document.getElementById('start-sound-icon');
-      this.startSoundText = document.getElementById('start-sound-text');
+    activeGate = {
+      y: -60,
+      passed: false,
+      options: shuffled.map((val, idx) => ({
+        lane: idx,
+        value: val,
+        isCorrect: val === challenge.answer
+      }))
+    };
+  }
 
-      // End Screen Elements
-      this.endHeaderBadge = document.getElementById('end-header-badge');
-      this.endTitle = document.getElementById('end-title');
-      this.endSubtitle = document.getElementById('end-subtitle');
-      this.starsContainer = document.getElementById('stars-container');
-      this.finalScoreVal = document.getElementById('final-score-val');
-      this.finalChallengesVal = document.getElementById('final-challenges-val');
-      this.finalLivesVal = document.getElementById('final-lives-val');
-      this.finalTimeVal = document.getElementById('final-time-val');
+  function spawnObstacle() {
+    // Only spawn hurdle in 1 lane if no gate is right at the horizon
+    if (activeGate && activeGate.y < 160) return;
 
-      // Buttons
-      this.startGameBtn = document.getElementById('start-game-btn');
-      this.howToPlayBtn = document.getElementById('how-to-play-btn');
-      this.closeInstructionsBtn = document.getElementById('close-instructions-btn');
-      this.startFromInstBtn = document.getElementById('start-from-instructions-btn');
-      this.playAgainBtn = document.getElementById('play-again-btn');
-      this.btnLeft = document.getElementById('btn-left');
-      this.btnRight = document.getElementById('btn-right');
+    const lane = Math.floor(Math.random() * 3);
+    obstacles.push({
+      y: -40,
+      lane: lane,
+      hit: false
+    });
+  }
 
-      // Audio Manager
-      this.audio = new AudioManager();
+  // ==========================================================================
+  // 7. RENDER & UPDATE LOOP
+  // ==========================================================================
+  function update() {
+    if (!isPlaying || isGameOver) return;
 
-      // Game States: 'START', 'PLAYING', 'GAMEOVER', 'VICTORY'
-      this.state = 'START';
-      this.score = 0;
-      this.lives = 3;
-      this.timer = 60;
-      this.currentChallengeIndex = 0;
-      this.challenges = [...MATH_CHALLENGES];
-      this.activeChallenge = null;
+    // Smooth lane steering
+    const dx = targetRunnerX - runner.x;
+    runner.x += dx * 0.25;
+    runner.y = canvas.height - 110;
 
-      // Runner World & Perspective Settings
-      this.laneCount = 3; // Lane 0 (Left), 1 (Middle), 2 (Right)
-      this.playerLane = 1; // Start in middle lane
-      this.playerCurrentLaneX = 1; // For smooth lerp animation
-      this.playerY = 0;
-      this.playerJumpY = 0;
-      this.isJumping = false;
-      this.stumbleTimer = 0;
-      this.runFrame = 0;
-
-      // 3D Perspective Highway settings
-      this.roadSegments = [];
-      this.segmentCount = 120;
-      this.segmentLength = 100;
-      this.cameraZ = 0;
-      this.speed = 450; // Units per second
-      this.horizonRatio = 0.38; // Horizon position Y (0 to 1)
-
-      // Approaching Gates (3 gates per challenge, 1 per lane)
-      this.gates = [];
-      this.gateZ = 1200; // Starting distance
-      this.gatePassed = false;
-
-      // Side Scenery (Trees, Neon Pillars, floating crystals)
-      this.sceneryProps = [];
-      this.initScenery();
-
-      // Particles & Visual FX
-      this.particles = [];
-      this.floatingTexts = [];
-
-      // Timing & Animation
-      this.lastTime = 0;
-      this.timerInterval = null;
-      this.animFrameId = null;
-
-      // Setup
-      this.resizeCanvas();
-      this.bindEvents();
-      this.updateSoundUI();
-    }
-
-    // ========================================================================
-    // INITIALIZATION & EVENT BINDINGS
-    // ========================================================================
-    initScenery() {
-      this.sceneryProps = [];
-      for (let i = 0; i < 40; i++) {
-        this.sceneryProps.push({
-          z: i * 200 + Math.random() * 50,
-          side: i % 2 === 0 ? -1 : 1, // -1 Left, 1 Right
-          distance: 1.6 + Math.random() * 0.8,
-          type: Math.floor(Math.random() * 3), // 0: Tree, 1: Tech Pillar, 2: Crystal
-          hue: Math.floor(Math.random() * 360)
-        });
-      }
-    }
-
-    resizeCanvas() {
-      const rect = this.container.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      
-      this.canvas.width = rect.width * dpr;
-      this.canvas.height = rect.height * dpr;
-      this.ctx.resetTransform();
-      this.ctx.scale(dpr, dpr);
-
-      this.virtualWidth = rect.width;
-      this.virtualHeight = rect.height;
-    }
-
-    bindEvents() {
-      window.addEventListener('resize', () => this.resizeCanvas());
-
-      // Keyboard Controls
-      window.addEventListener('keydown', (e) => {
-        if (this.state !== 'PLAYING') return;
-
-        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-          this.moveLeft();
-          e.preventDefault();
-        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-          this.moveRight();
-          e.preventDefault();
-        }
-      });
-
-      // UI Button Clicks
-      this.startGameBtn.addEventListener('click', () => this.startNewGame());
-      if (this.howToPlayBtn) this.howToPlayBtn.addEventListener('click', () => this.showInstructions());
-      const hudHowToPlay = document.getElementById('hud-how-to-play-btn');
-      if (hudHowToPlay) hudHowToPlay.addEventListener('click', () => this.showInstructions());
-      this.closeInstructionsBtn.addEventListener('click', () => this.hideInstructions());
-      this.startFromInstBtn.addEventListener('click', () => {
-        this.hideInstructions();
-        this.startNewGame();
-      });
-      this.playAgainBtn.addEventListener('click', () => this.startNewGame());
-
-      // Sound Toggles
-      this.soundToggleBtn.addEventListener('click', () => {
-        this.audio.toggleSound();
-        this.updateSoundUI();
-      });
-      this.startSoundToggle.addEventListener('click', () => {
-        this.audio.toggleSound();
-        this.updateSoundUI();
-      });
-
-      // Mobile Touch Buttons
-      this.btnLeft.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        if (this.state === 'PLAYING') this.moveLeft();
-      });
-      this.btnRight.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        if (this.state === 'PLAYING') this.moveRight();
-      });
-
-      // Canvas Touch & Swipe Controls
-      let touchStartX = 0;
-      let touchStartY = 0;
-
-      this.canvas.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 0) {
-          touchStartX = e.touches[0].clientX;
-          touchStartY = e.touches[0].clientY;
-        }
-      }, { passive: true });
-
-      this.canvas.addEventListener('touchend', (e) => {
-        if (this.state !== 'PLAYING' || !e.changedTouches.length) return;
-        const deltaX = e.changedTouches[0].clientX - touchStartX;
-        const deltaY = e.changedTouches[0].clientY - touchStartY;
-
-        if (Math.abs(deltaX) > 30 && Math.abs(deltaX) > Math.abs(deltaY)) {
-          if (deltaX < 0) this.moveLeft();
-          else this.moveRight();
-        } else {
-          // Direct tap on screen halves
-          const rect = this.canvas.getBoundingClientRect();
-          const tapX = touchStartX - rect.left;
-          if (tapX < rect.width * 0.4) {
-            this.moveLeft();
-          } else if (tapX > rect.width * 0.6) {
-            this.moveRight();
-          }
-        }
-      }, { passive: true });
-    }
-
-    updateSoundUI() {
-      const enabled = window.NumberlandFeedback ? window.NumberlandFeedback.isSoundEnabled() : this.audio.soundEnabled;
-      this.audio.soundEnabled = enabled;
-      const icon = enabled ? '🔊' : '🔇';
-      if (this.soundIcon) this.soundIcon.textContent = icon;
-      if (this.startSoundIcon) this.startSoundIcon.textContent = icon;
-      if (this.startSoundText) this.startSoundText.textContent = enabled ? 'ON' : 'OFF';
-      if (this.soundToggleBtn) this.soundToggleBtn.title = enabled ? 'Mute Sound' : 'Unmute Sound';
-    }
-
-    showInstructions() {
-      this.instructionsModal.classList.remove('hidden');
-      this.instructionsModal.classList.add('active');
-    }
-
-    hideInstructions() {
-      this.instructionsModal.classList.remove('active');
-      this.instructionsModal.classList.add('hidden');
-    }
-
-    // ========================================================================
-    // GAMEPLAY LOGIC & CONTROLS
-    // ========================================================================
-    moveLeft() {
-      if (this.playerLane > 0) {
-        this.playerLane--;
-        this.audio.playLaneSwitch();
-        this.createLaneSwitchParticles(-1);
-      }
-    }
-
-    moveRight() {
-      if (this.playerLane < this.laneCount - 1) {
-        this.playerLane++;
-        this.audio.playLaneSwitch();
-        this.createLaneSwitchParticles(1);
-      }
-    }
-
-    startNewGame() {
-      this.state = 'PLAYING';
-      this.score = 0;
-      this.lives = 3;
-      this.timer = 60;
-      this.currentChallengeIndex = 0;
-      this.playerLane = 1;
-      this.playerCurrentLaneX = 1;
-      this.gatePassed = false;
-      this.stumbleTimer = 0;
-      this.particles = [];
-      this.floatingTexts = [];
-      this.cameraZ = 0;
-
-      // Reset combo
-      if (window.NumberlandFeedback) {
-        window.NumberlandFeedback.resetCombo();
-      }
-
-      // Hide overlays
-      this.startScreen.classList.remove('active');
-      this.startScreen.classList.add('hidden');
-      this.endScreen.classList.remove('active');
-      this.endScreen.classList.add('hidden');
-      this.instructionsModal.classList.add('hidden');
-
-      // Update HUD & clear warning
-      this.updateHUD();
-      if (typeof updateTimerWarning === 'function') {
-        updateTimerWarning(this.timerEl, this.timer);
-      }
-      this.loadChallenge(this.currentChallengeIndex);
-
-      // Start BGM
-      this.audio.startBGM();
-
-      // Start Countdown Timer
-      if (this.timerInterval) clearInterval(this.timerInterval);
-      this.timerInterval = setInterval(() => {
-        if (this.state !== 'PLAYING') return;
-        this.timer--;
-        this.timerEl.textContent = `${this.timer}s`;
-
-        if (typeof updateTimerWarning === 'function') {
-          updateTimerWarning(this.timerEl, this.timer);
-        }
-
-        if (this.timer <= 0) {
-          this.endGame(false, "Time's up!");
-        }
-      }, 1000);
-
-      // Start Game Loop
-      this.lastTime = performance.now();
-      if (!this.animFrameId) {
-        this.animFrameId = requestAnimationFrame((t) => this.gameLoop(t));
-      }
-    }
-
-    loadChallenge(index) {
-      if (index >= this.challenges.length) {
-        this.endGame(true, "All challenges conquered!");
-        return;
-      }
-
-      // Show challenge transition badge for challenges after the 1st
-      if (index > 0 && typeof showChallengeTransition === 'function') {
-        showChallengeTransition(`CHALLENGE ${index + 1}/10`, { container: this.container });
-      }
-
-      this.activeChallenge = this.challenges[index];
-      this.gatePassed = false;
-      this.gateZ = 1300; // Reset gates approach distance
-
-      // Shuffle options across 3 lanes
-      const shuffledOptions = [...this.activeChallenge.options];
-      for (let i = shuffledOptions.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
-      }
-
-      // Generate 3 gates
-      this.gates = shuffledOptions.map((value, laneIndex) => ({
-        lane: laneIndex,
-        value: value,
-        isCorrect: value === this.activeChallenge.answer,
-        color: laneIndex === 0 ? '#38bdf8' : (laneIndex === 1 ? '#a855f7' : '#ec4899')
-      }));
-
-      // Update HUD & Billboard
-      this.questionTextEl.textContent = this.activeChallenge.question;
-      this.questionBillboard.classList.remove('pulse-new');
-      void this.questionBillboard.offsetWidth; // Trigger reflow
-      this.questionBillboard.classList.add('pulse-new');
-
-      this.updateHUD();
-    }
-
-    updateHUD() {
-      this.scoreEl.textContent = this.score;
-      this.timerEl.textContent = `${this.timer}s`;
-      this.challengeEl.textContent = `${Math.min(this.currentChallengeIndex + 1, 10)}/10`;
-
-      // Update Lives Hearts
-      const hearts = this.livesContainer.querySelectorAll('.heart');
-      hearts.forEach((heart, idx) => {
-        if (idx < this.lives) {
-          heart.classList.remove('lost');
-        } else {
-          heart.classList.add('lost');
-        }
-      });
-    }
-
-    showToastFeedback(text, type = 'correct') {
-      this.feedbackBanner.textContent = text;
-      this.feedbackBanner.className = `feedback-toast show-${type}`;
-      setTimeout(() => {
-        this.feedbackBanner.className = 'feedback-toast';
-      }, 700);
-    }
-
-    triggerScreenShake() {
-      if (typeof shakeScreen === 'function') {
-        shakeScreen(this.container);
-      } else {
-        this.container.classList.add('screen-shake');
-        setTimeout(() => this.container.classList.remove('screen-shake'), 400);
-      }
-    }
-
-    triggerFlash(type = 'green') {
-      const cls = type === 'green' ? 'screen-flash-green' : 'screen-flash-red';
-      this.container.classList.add(cls);
-      setTimeout(() => this.container.classList.remove(cls), 400);
-    }
-
-    // ========================================================================
-    // COLLISION & CHALLENGE RESOLUTION
-    // ========================================================================
-    handleGateCollision() {
-      this.gatePassed = true;
-      const chosenGate = this.gates.find(g => g.lane === this.playerLane);
-      const targetX = this.virtualWidth / 2 + (this.playerCurrentLaneX - 1) * (this.virtualWidth * 0.25);
-      const targetY = this.virtualHeight * 0.55;
-
-      if (chosenGate && chosenGate.isCorrect) {
-        // Correct Answer Collected!
-        const prevScore = this.score;
-        this.score += 100;
-
-        if (typeof showCorrectFeedback === 'function') {
-          showCorrectFeedback({
-            points: 100,
-            message: 'GREAT JOB!',
-            container: this.container,
-            x: targetX,
-            y: targetY
+    // Jump physics
+    if (runner.isJumping) {
+      runner.jumpY += runner.jumpVy;
+      runner.jumpVy += 0.82;
+      if (runner.jumpY >= 0) {
+        runner.jumpY = 0;
+        runner.isJumping = false;
+        runner.jumpVy = 0;
+        for (let i = 0; i < 6; i++) {
+          particles.push({
+            x: runner.x + (Math.random() - 0.5) * 20,
+            y: runner.y + 18,
+            vx: (Math.random() - 0.5) * 2.5,
+            vy: -0.5 - Math.random() * 1.5,
+            radius: 4 + Math.random() * 4,
+            color: '#cbd5e1',
+            alpha: 0.7,
+            life: 22
           });
-        } else {
-          this.audio.playCorrect();
-          this.showToastFeedback("+100 NICE!", "correct");
-          this.triggerFlash('green');
-          this.createSuccessParticles();
         }
+      }
+    }
 
-        if (typeof animateScore === 'function') {
-          animateScore(this.scoreEl, prevScore, this.score, 350);
-        } else {
-          this.scoreEl.textContent = this.score;
-        }
+    if (runner.stumbleTimer > 0) runner.stumbleTimer--;
+    runner.runAnimFrame = (runner.runAnimFrame + 0.28) % 4;
 
-        this.isJumping = true;
-        this.playerJumpY = 25;
-      } else {
-        // Wrong Answer Hit!
-        const hearts = this.livesContainer.querySelectorAll('.heart');
-        const lostHeart = hearts[this.lives - 1] || null;
+    if (screenShakeIntensity > 0.1) {
+      screenShakeIntensity *= 0.88;
+    } else {
+      screenShakeIntensity = 0;
+    }
 
-        this.lives--;
-        this.stumbleTimer = 0.6;
+    // Scroll speed tuned for comfortable reading (~4.8s travel time)
+    const scrollSpeed = 3.6;
+    trackScrollOffset = (trackScrollOffset + scrollSpeed) % 60;
 
-        if (typeof showWrongFeedback === 'function') {
-          showWrongFeedback({
-            message: '-1 LIFE 💔',
-            container: this.container,
-            heartEl: lostHeart,
-            x: targetX,
-            y: targetY
+    // Gate update
+    if (!activeGate) {
+      spawnGate();
+    } else {
+      activeGate.y += scrollSpeed;
+
+      // Check collision when gate reaches player y
+      if (!activeGate.passed && activeGate.y >= runner.y - 20) {
+        activeGate.passed = true;
+        totalAttempts++;
+
+        const chosenOption = activeGate.options.find(opt => opt.lane === currentLane);
+        const challenge = MATH_CHALLENGES[currentStageIdx];
+
+        if (chosenOption && chosenOption.isCorrect) {
+          // CORRECT ANSWER
+          totalStagesCleared++;
+          playCollectSound(combo);
+          playCorrectFanfare();
+
+          const pts = 100 * combo;
+          score += pts;
+          combo = Math.min(8, combo + 1);
+          if (combo > bestCombo) bestCombo = combo;
+
+          floatingTexts.push({
+            x: runner.x,
+            y: runner.y - 30,
+            text: `CORRECT! +${pts} PTS!`,
+            color: '#10b981',
+            alpha: 1,
+            life: 55
           });
-        } else {
-          this.audio.playWrong();
-          this.triggerScreenShake();
-          this.triggerFlash('red');
-          this.showToastFeedback("-1 LIFE 💔", "wrong");
-          this.createHitParticles();
-        }
 
-        if (this.lives <= 0) {
-          this.updateHUD();
-          this.endGame(false, "Out of lives!");
-          return;
-        }
-      }
-
-      this.updateHUD();
-
-      // Proceed to Next Challenge after short delay
-      setTimeout(() => {
-        if (this.state === 'PLAYING') {
-          this.currentChallengeIndex++;
-          this.loadChallenge(this.currentChallengeIndex);
-        }
-      }, 400);
-    }
-
-    endGame(isVictory, reasonText) {
-      this.state = isVictory ? 'VICTORY' : 'GAMEOVER';
-      if (this.timerInterval) clearInterval(this.timerInterval);
-      this.audio.stopBGM();
-
-      if (typeof updateTimerWarning === 'function') {
-        updateTimerWarning(this.timerEl, 60);
-      }
-
-      // Calculate Stars:
-      // 1 Star: Completed run
-      // 2 Stars: Score >= 700
-      // 3 Stars: Score >= 900 and at least 2 lives remaining
-      let stars = 0;
-      if (isVictory) {
-        if (this.score >= 900 && this.lives >= 2) {
-          stars = 3;
-        } else if (this.score >= 700) {
-          stars = 2;
-        } else {
-          stars = 1;
-        }
-        if (typeof playGameSound === 'function') {
-          playGameSound('victory');
-        } else {
-          this.audio.playVictory();
-        }
-      } else {
-        stars = this.score >= 600 ? 1 : 0;
-        if (typeof playGameSound === 'function') {
-          playGameSound('gameover');
-        } else {
-          this.audio.playGameOver();
-        }
-      }
-
-      // Save stars to localStorage for main portal progress
-      try {
-        if (window.NumberlandProfile) {
-          window.NumberlandProfile.recordGameResult('runner', this.score, stars, Math.max(0, 60 - this.timer));
-        } else {
-          const existing = parseInt(localStorage.getItem('math_runner_stars') || '0', 10);
-          if (stars > existing) {
-            localStorage.setItem('math_runner_stars', stars);
+          // Celebration particles
+          for (let p = 0; p < 20; p++) {
+            const angle = Math.random() * Math.PI * 2;
+            const spd = 2 + Math.random() * 5;
+            particles.push({
+              x: runner.x,
+              y: runner.y,
+              vx: Math.cos(angle) * spd,
+              vy: Math.sin(angle) * spd,
+              radius: 4 + Math.random() * 5,
+              color: ['#f59e0b', '#fbbf24', '#38bdf8', '#10b981', '#ffffff'][Math.floor(Math.random() * 5)],
+              alpha: 1,
+              life: 35
+            });
           }
-          localStorage.setItem('math_runner_highscore', Math.max(this.score, parseInt(localStorage.getItem('math_runner_highscore') || '0', 10)));
-        }
-      } catch (e) {}
 
-      // Populate End Screen
-      this.endHeaderBadge.textContent = isVictory ? 'VICTORY!' : 'GAME OVER';
-      this.endHeaderBadge.className = `result-badge ${isVictory ? 'victory' : 'gameover'}`;
-      this.endTitle.textContent = isVictory ? 'RUN COMPLETED!' : 'RUN FAILED!';
-      this.endSubtitle.textContent = isVictory 
-        ? (stars === 3 ? '🌟 Outstanding Speed & Math Mastery!' : '🎉 Great job! Keep practicing!') 
-        : `${reasonText} Try again to conquer all 10!`;
+          if (currentStageIdx + 1 < MATH_CHALLENGES.length) {
+            currentStageIdx++;
+            activeGate = null;
+            obstacles = [];
+            updateBillboard();
+          } else {
+            endGame(true);
+          }
+        } else {
+          // WRONG ANSWER
+          playWrongBuzz();
+          lives--;
+          combo = 1;
+          runner.stumbleTimer = 35;
 
-      // Update Star icons
-      const starSlots = this.starsContainer.querySelectorAll('.star-slot');
-      starSlots.forEach((slot, idx) => {
-        slot.classList.remove('earned');
-        if (idx < stars) {
-          setTimeout(() => slot.classList.add('earned'), 300 + idx * 250);
-        }
-      });
+          const chosenVal = chosenOption ? chosenOption.value : '?';
+          floatingTexts.push({
+            x: runner.x,
+            y: runner.y - 30,
+            text: `WRONG (${chosenVal})! -1 LIFE`,
+            color: '#ef4444',
+            alpha: 1,
+            life: 55
+          });
 
-      // Update Stats
-      this.finalScoreVal.textContent = this.score;
-      this.finalChallengesVal.textContent = `${this.currentChallengeIndex} / 10`;
-      this.finalLivesVal.textContent = '❤️'.repeat(Math.max(0, this.lives)) || '💔';
-      this.finalTimeVal.textContent = `${Math.max(0, this.timer)}s`;
+          showHint(challenge.explain);
+          updateHUD();
 
-      // Show Overlay
-      this.endScreen.classList.remove('hidden');
-      this.endScreen.classList.add('active');
-    }
-
-    // ========================================================================
-    // PARTICLE FX & FLOATING TEXTS
-    // ========================================================================
-    createSuccessParticles() {
-      const centerX = this.virtualWidth / 2;
-      const centerY = this.virtualHeight * 0.75;
-      for (let i = 0; i < 24; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 80 + Math.random() * 200;
-        this.particles.push({
-          x: centerX + (this.playerCurrentLaneX - 1) * (this.virtualWidth * 0.25),
-          y: centerY,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed - 60,
-          color: ['#fbbf24', '#38bdf8', '#34d399', '#f472b6'][Math.floor(Math.random() * 4)],
-          size: 4 + Math.random() * 6,
-          alpha: 1,
-          life: 0.8
-        });
-      }
-    }
-
-    createHitParticles() {
-      const centerX = this.virtualWidth / 2;
-      const centerY = this.virtualHeight * 0.75;
-      for (let i = 0; i < 18; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 60 + Math.random() * 150;
-        this.particles.push({
-          x: centerX + (this.playerCurrentLaneX - 1) * (this.virtualWidth * 0.25),
-          y: centerY,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color: '#f43f5e',
-          size: 5 + Math.random() * 5,
-          alpha: 1,
-          life: 0.5
-        });
-      }
-    }
-
-    createLaneSwitchParticles(dir) {
-      const startX = this.virtualWidth / 2 + (this.playerCurrentLaneX - 1) * (this.virtualWidth * 0.25);
-      const startY = this.virtualHeight * 0.82;
-      for (let i = 0; i < 6; i++) {
-        this.particles.push({
-          x: startX,
-          y: startY,
-          vx: -dir * (40 + Math.random() * 60),
-          vy: -20 - Math.random() * 30,
-          color: 'rgba(255, 255, 255, 0.6)',
-          size: 3 + Math.random() * 4,
-          alpha: 0.8,
-          life: 0.35
-        });
-      }
-    }
-
-    addFloatingText(text, color = '#ffffff') {
-      const x = this.virtualWidth / 2 + (this.playerCurrentLaneX - 1) * (this.virtualWidth * 0.25);
-      const y = this.virtualHeight * 0.65;
-      this.floatingTexts.push({
-        text,
-        color,
-        x,
-        y,
-        alpha: 1,
-        life: 0.9,
-        scale: 1.3
-      });
-    }
-
-    // ========================================================================
-    // MAIN GAME LOOP & 2.5D CANVAS RENDERING
-    // ========================================================================
-    gameLoop(timestamp) {
-      const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1);
-      this.lastTime = timestamp;
-
-      this.update(dt);
-      this.render();
-
-      this.animFrameId = requestAnimationFrame((t) => this.gameLoop(t));
-    }
-
-    update(dt) {
-      this.runFrame += dt * 12;
-
-      // Smooth Lane Interpolation (Lerp)
-      const targetLaneX = this.playerLane;
-      this.playerCurrentLaneX += (targetLaneX - this.playerCurrentLaneX) * Math.min(1, dt * 14);
-
-      // Jump / Stumble Animation Logic
-      if (this.isJumping) {
-        this.playerJumpY -= dt * 60;
-        if (this.playerJumpY <= 0) {
-          this.playerJumpY = 0;
-          this.isJumping = false;
-        }
-      }
-
-      if (this.stumbleTimer > 0) {
-        this.stumbleTimer -= dt;
-      }
-
-      if (this.state === 'PLAYING') {
-        // Advance Camera & Gates
-        this.cameraZ += this.speed * dt;
-        this.gateZ -= this.speed * dt;
-
-        // Check Gate Proximity & Collision
-        if (this.gateZ <= 50 && !this.gatePassed) {
-          this.handleGateCollision();
-        }
-      }
-
-      // Update Particles
-      for (let i = this.particles.length - 1; i >= 0; i--) {
-        const p = this.particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.alpha -= dt / p.life;
-        if (p.alpha <= 0) {
-          this.particles.splice(i, 1);
-        }
-      }
-
-      // Update Floating Texts
-      for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
-        const ft = this.floatingTexts[i];
-        ft.y -= dt * 45;
-        ft.alpha -= dt / ft.life;
-        if (ft.alpha <= 0) {
-          this.floatingTexts.splice(i, 1);
-        }
-      }
-    }
-
-    render() {
-      const w = this.virtualWidth;
-      const h = this.virtualHeight;
-      const ctx = this.ctx;
-
-      ctx.clearRect(0, 0, w, h);
-
-      // 1. Render Sky & Distant Mountains
-      this.renderEnvironment(w, h);
-
-      // 2. Render 3D Perspective Road
-      this.renderRoad(w, h);
-
-      // 3. Render Approaching Answer Gates
-      this.renderGates(w, h);
-
-      // 4. Render Runner Character
-      this.renderCharacter(w, h);
-
-      // 5. Render Particles & Floating Texts
-      this.renderFX(w, h);
-    }
-
-    renderEnvironment(w, h) {
-      const ctx = this.ctx;
-      const horizonY = h * this.horizonRatio;
-
-      // Realistic Sunset / Dusk Atmosphere with volumetric gradient
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
-      skyGrad.addColorStop(0, '#040714');
-      skyGrad.addColorStop(0.35, '#0f172a');
-      skyGrad.addColorStop(0.7, '#1e1b4b');
-      skyGrad.addColorStop(0.9, '#431407');
-      skyGrad.addColorStop(1, '#ea580c');
-      ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, w, horizonY);
-
-      // Realistic Golden Sun / Halo with Lens Flare
-      ctx.save();
-      const sunX = w * 0.5;
-      const sunY = horizonY * 0.9;
-      const sunGrad = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, 130);
-      sunGrad.addColorStop(0, '#fffbeb');
-      sunGrad.addColorStop(0.2, '#fde047');
-      sunGrad.addColorStop(0.5, 'rgba(249, 115, 22, 0.45)');
-      sunGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = sunGrad;
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, 130, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      // Distant Realistic Cityscape Silhouette with Illuminated Windows
-      ctx.save();
-      ctx.fillStyle = '#090d16';
-      const buildingWidths = [45, 30, 55, 40, 70, 35, 60, 48, 65, 38, 52, 44, 58, 36, 62, 50, 42, 68, 34, 54, 46, 60];
-      let curBx = 0;
-      let bIdx = 0;
-      while (curBx < w) {
-        const bw = buildingWidths[bIdx % buildingWidths.length];
-        const bh = 30 + ((bIdx * 17) % 55);
-        ctx.fillRect(curBx, horizonY - bh, bw, bh);
-        
-        // Window lights
-        ctx.fillStyle = (bIdx % 3 === 0) ? 'rgba(253, 224, 71, 0.6)' : 'rgba(56, 189, 248, 0.5)';
-        for (let wy = horizonY - bh + 6; wy < horizonY - 4; wy += 9) {
-          for (let wx = curBx + 5; wx < curBx + bw - 5; wx += 8) {
-            if ((wx + wy) % 5 === 0) {
-              ctx.fillRect(wx, wy, 3.5, 4.5);
-            }
+          if (lives <= 0) {
+            endGame(false);
+          } else {
+            // Respawn same gate after a short gap
+            activeGate = null;
+            setTimeout(() => {
+              if (isPlaying && !isGameOver && !activeGate) {
+                spawnGate();
+              }
+            }, 800);
           }
         }
-        ctx.fillStyle = '#090d16';
-        curBx += bw + 3;
-        bIdx++;
       }
-      ctx.restore();
 
-      // Side Grassland / Mountain Verge
-      const vergeGrad = ctx.createLinearGradient(0, horizonY, 0, h);
-      vergeGrad.addColorStop(0, '#064e3b');
-      vergeGrad.addColorStop(0.4, '#022c22');
-      vergeGrad.addColorStop(1, '#011711');
-      ctx.fillStyle = vergeGrad;
-      ctx.fillRect(0, horizonY, w, h - horizonY);
+      if (activeGate && activeGate.y > canvas.height + 60) {
+        activeGate = null;
+      }
     }
 
-    renderRoad(w, h) {
-      const ctx = this.ctx;
-      const horizonY = h * this.horizonRatio;
-      const roadTopWidth = w * 0.16;
-      const roadBottomWidth = w * 0.88;
-      const roadCenterX = w * 0.5;
+    // Spawn Hurdles between gates
+    if (Math.random() < 0.015 && obstacles.length < 2 && (!activeGate || activeGate.y > 220 || activeGate.y < -30)) {
+      spawnObstacle();
+    }
 
-      // Draw Main Asphalt Surface with Realistic Gradient
-      const roadGrad = ctx.createLinearGradient(0, horizonY, 0, h);
-      roadGrad.addColorStop(0, '#1e293b');
-      roadGrad.addColorStop(0.5, '#0f172a');
-      roadGrad.addColorStop(1, '#020617');
-      ctx.fillStyle = roadGrad;
-      ctx.beginPath();
-      ctx.moveTo(roadCenterX - roadTopWidth / 2, horizonY);
-      ctx.lineTo(roadCenterX + roadTopWidth / 2, horizonY);
-      ctx.lineTo(roadCenterX + roadBottomWidth / 2, h);
-      ctx.lineTo(roadCenterX - roadBottomWidth / 2, h);
-      ctx.closePath();
-      ctx.fill();
+    // Update Hurdles
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const obs = obstacles[i];
+      obs.y += scrollSpeed;
 
-      // Banked Red & White Rumble Curbs (Realistic Apex Curbs)
-      const curbSegments = 20;
-      const curbScroll = (this.cameraZ % 80) / 80;
-      for (let i = 0; i < curbSegments; i++) {
-        const p1 = Math.pow((i + curbScroll) / curbSegments, 2.2);
-        const p2 = Math.pow(Math.min(1, (i + 1 + curbScroll) / curbSegments), 2.2);
+      const obsX = getLaneCenterX(obs.lane);
 
-        const y1 = horizonY + p1 * (h - horizonY);
-        const y2 = horizonY + p2 * (h - horizonY);
+      // Hit obstacle if in same lane, close in Y, and NOT jumped
+      if (!obs.hit && obs.lane === currentLane && Math.abs(runner.y - obs.y) < 24) {
+        if (runner.jumpY > -20) {
+          obs.hit = true;
+          playHurdleHitSound();
+          lives--;
+          combo = 1;
+          runner.stumbleTimer = 30;
 
-        const w1 = roadTopWidth + p1 * (roadBottomWidth - roadTopWidth);
-        const w2 = roadTopWidth + p2 * (roadBottomWidth - roadTopWidth);
+          floatingTexts.push({
+            x: obsX,
+            y: obs.y - 20,
+            text: `HURDLE HIT! -1 LIFE`,
+            color: '#ef4444',
+            alpha: 1,
+            life: 50
+          });
 
-        const curbW1 = Math.max(2, 18 * p1);
-        const curbW2 = Math.max(2, 18 * p2);
+          showHint('Press JUMP! or Spacebar to leap over hurdles!');
+          updateHUD();
 
-        const isRed = (i + Math.floor(this.cameraZ / 40)) % 2 === 0;
-        ctx.fillStyle = isRed ? '#ef4444' : '#f8fafc';
-
-        // Left Curb
-        ctx.beginPath();
-        ctx.moveTo(roadCenterX - w1 / 2, y1);
-        ctx.lineTo(roadCenterX - w2 / 2, y2);
-        ctx.lineTo(roadCenterX - w2 / 2 - curbW2, y2);
-        ctx.lineTo(roadCenterX - w1 / 2 - curbW1, y1);
-        ctx.closePath();
-        ctx.fill();
-
-        // Right Curb
-        ctx.beginPath();
-        ctx.moveTo(roadCenterX + w1 / 2, y1);
-        ctx.lineTo(roadCenterX + w2 / 2, y2);
-        ctx.lineTo(roadCenterX + w2 / 2 + curbW2, y2);
-        ctx.lineTo(roadCenterX + w1 / 2 + curbW1, y1);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Neon Guardrail Glow
-      ctx.save();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#38bdf8';
-      ctx.shadowColor = '#0284c7';
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.moveTo(roadCenterX - roadTopWidth / 2, horizonY);
-      ctx.lineTo(roadCenterX - roadBottomWidth / 2, h);
-      ctx.moveTo(roadCenterX + roadTopWidth / 2, horizonY);
-      ctx.lineTo(roadCenterX + roadBottomWidth / 2, h);
-      ctx.stroke();
-      ctx.restore();
-
-      // Realistic Yellow Dashed Center Lane Dividers (3 Lanes -> 2 Dividers)
-      const lines = 18;
-      const segmentScroll = (this.cameraZ % 100) / 100;
-      for (let laneDiv = 1; laneDiv <= 2; laneDiv++) {
-        const laneOffsetRatio = (laneDiv / 3) - 0.5; // -0.166, +0.166
-        for (let i = 0; i < lines; i++) {
-          if (i % 2 === 0) continue; // Dashed look
-          const p = (i + segmentScroll) / lines;
-          const pNext = Math.min(1, p + 0.045);
-
-          const y1 = horizonY + Math.pow(p, 2.2) * (h - horizonY);
-          const y2 = horizonY + Math.pow(pNext, 2.2) * (h - horizonY);
-
-          const curWidth1 = roadTopWidth + Math.pow(p, 2.2) * (roadBottomWidth - roadTopWidth);
-          const curWidth2 = roadTopWidth + Math.pow(pNext, 2.2) * (roadBottomWidth - roadTopWidth);
-
-          const x1 = roadCenterX + laneOffsetRatio * curWidth1;
-          const x2 = roadCenterX + laneOffsetRatio * curWidth2;
-
-          ctx.save();
-          ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = Math.max(1.5, 4 * p);
-          ctx.shadowColor = 'rgba(251, 191, 36, 0.6)';
-          ctx.shadowBlur = 4 * p;
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.stroke();
-          ctx.restore();
+          if (lives <= 0) {
+            endGame(false);
+          }
         }
       }
 
-      // Render Side Scenery (Trees / Pillars)
-      this.renderScenery(w, h, horizonY, roadTopWidth, roadBottomWidth, roadCenterX);
+      if (obs.y > canvas.height + 40) {
+        obstacles.splice(i, 1);
+      }
     }
 
-    renderScenery(w, h, horizonY, topW, botW, centerX) {
-      const ctx = this.ctx;
-      this.sceneryProps.forEach(prop => {
-        let relZ = (prop.z - (this.cameraZ % 8000) + 8000) % 8000;
-        if (relZ < 50 || relZ > 3000) return;
-
-        const p = Math.pow(Math.max(0, 1 - relZ / 3000), 2.5);
-        const y = horizonY + p * (h - horizonY);
-        const roadW = topW + p * (botW - topW);
-        const x = centerX + prop.side * (roadW * 0.65 + prop.distance * 80 * p);
-        const size = (44 + prop.distance * 34) * p;
-
-        if (size < 2) return;
-
-        ctx.save();
-        if (prop.type === 0) {
-          // Lush Realistic Cyber Palm / Tree
-          ctx.fillStyle = '#065f46';
-          ctx.beginPath();
-          ctx.arc(x, y - size, size * 0.8, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#10b981';
-          ctx.beginPath();
-          ctx.arc(x, y - size * 1.2, size * 0.6, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(x - size * 0.1, y - size * 0.5, size * 0.2, size * 0.5);
-        } else {
-          // Glowing Neon Energy Tower
-          ctx.fillStyle = `hsl(${prop.hue}, 90%, 65%)`;
-          ctx.shadowColor = `hsl(${prop.hue}, 90%, 65%)`;
-          ctx.shadowBlur = 10 * p;
-          ctx.beginPath();
-          ctx.moveTo(x, y - size * 1.5);
-          ctx.lineTo(x + size * 0.45, y - size * 0.8);
-          ctx.lineTo(x, y - size * 0.2);
-          ctx.lineTo(x - size * 0.45, y - size * 0.8);
-          ctx.closePath();
-          ctx.fill();
-        }
-        ctx.restore();
-      });
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.alpha -= 0.025;
+      p.life--;
+      if (p.life <= 0 || p.alpha <= 0) {
+        particles.splice(i, 1);
+      }
     }
 
-    renderGates(w, h) {
-      if (this.gateZ < 20 || this.gateZ > 1400 || !this.gates.length) return;
+    // Update Floating Texts
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+      const ft = floatingTexts[i];
+      ft.y -= 1.2;
+      ft.alpha -= 0.02;
+      ft.life--;
+      if (ft.life <= 0 || ft.alpha <= 0) {
+        floatingTexts.splice(i, 1);
+      }
+    }
+  }
 
-      const ctx = this.ctx;
-      const horizonY = h * this.horizonRatio;
-      const roadTopWidth = w * 0.16;
-      const roadBottomWidth = w * 0.88;
-      const roadCenterX = w * 0.5;
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Perspective Scale calculation
-      const p = Math.pow(Math.max(0, 1 - (this.gateZ / 1400)), 2.3);
-      const y = horizonY + p * (h - horizonY);
-      const currentRoadWidth = roadTopWidth + p * (roadBottomWidth - roadTopWidth);
-      const laneWidth = currentRoadWidth / 3;
+    ctx.save();
+    if (screenShakeIntensity > 0) {
+      const sx = (Math.random() - 0.5) * screenShakeIntensity;
+      const sy = (Math.random() - 0.5) * screenShakeIntensity;
+      ctx.translate(sx, sy);
+    }
 
-      // Overhead Truss Arch connecting all lanes
-      const archY = y - laneWidth * 0.85;
-      ctx.save();
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = Math.max(2, 6 * p);
-      ctx.beginPath();
-      ctx.moveTo(roadCenterX - currentRoadWidth * 0.55, y);
-      ctx.lineTo(roadCenterX - currentRoadWidth * 0.55, archY);
-      ctx.lineTo(roadCenterX + currentRoadWidth * 0.55, archY);
-      ctx.lineTo(roadCenterX + currentRoadWidth * 0.55, y);
-      ctx.stroke();
-      ctx.restore();
+    // 1. Midnight Stadium Background
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGrad.addColorStop(0, '#091326');
+    skyGrad.addColorStop(0.5, '#0f244a');
+    skyGrad.addColorStop(1, '#1b3566');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      this.gates.forEach((gate) => {
-        const laneOffset = (gate.lane - 1); // -1, 0, 1
-        const x = roadCenterX + laneOffset * laneWidth;
-        const gateWidth = laneWidth * 0.86;
-        const gateHeight = gateWidth * 0.88;
-        const gateY = y - gateHeight * 0.6;
+    // Stadium Stands & Floodlights
+    ctx.fillStyle = '#0a1630';
+    ctx.fillRect(0, 0, canvas.width * 0.18, canvas.height);
+    ctx.fillRect(canvas.width * 0.82, 0, canvas.width * 0.18, canvas.height);
 
-        if (gateWidth < 10) return;
+    // Stadium floodlight beams
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.04)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(canvas.width * 0.4, canvas.height);
+    ctx.lineTo(canvas.width * 0.2, canvas.height); ctx.closePath(); ctx.fill();
 
+    const roadLeft = canvas.width * 0.18;
+    const roadRight = canvas.width * 0.82;
+    const roadWidth = roadRight - roadLeft;
+    const laneWidth = roadWidth / 3;
+
+    // Tartan Track Running Surface (Crimson Track)
+    ctx.fillStyle = '#991b1b';
+    ctx.fillRect(roadLeft, 0, roadWidth, canvas.height);
+
+    // Track Texture Stripes
+    ctx.fillStyle = '#7f1d1d';
+    for (let y = -60 + trackScrollOffset; y < canvas.height; y += 60) {
+      ctx.fillRect(roadLeft, y, roadWidth, 20);
+    }
+
+    // Neon Track Divider Lines
+    ctx.strokeStyle = '#f8fafc';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(roadLeft, 0); ctx.lineTo(roadLeft, canvas.height);
+    ctx.moveTo(roadLeft + laneWidth, 0); ctx.lineTo(roadLeft + laneWidth, canvas.height);
+    ctx.moveTo(roadLeft + laneWidth * 2, 0); ctx.lineTo(roadLeft + laneWidth * 2, canvas.height);
+    ctx.moveTo(roadRight, 0); ctx.lineTo(roadRight, canvas.height);
+    ctx.stroke();
+
+    // 2. Render Approaching Answer Gate Row
+    if (activeGate) {
+      activeGate.options.forEach(opt => {
+        const laneX = getLaneCenterX(opt.lane);
         ctx.save();
+        ctx.translate(laneX, activeGate.y);
 
-        // Realistic Glassmorphic Neon Billboard Panel
-        const grad = ctx.createLinearGradient(x - gateWidth / 2, gateY, x + gateWidth / 2, gateY + gateHeight);
-        grad.addColorStop(0, 'rgba(15, 23, 42, 0.94)');
-        grad.addColorStop(0.5, 'rgba(30, 41, 59, 0.96)');
-        grad.addColorStop(1, 'rgba(15, 23, 42, 0.98)');
-
-        ctx.fillStyle = grad;
-        ctx.strokeStyle = gate.color;
-        ctx.lineWidth = Math.max(2, 5 * p);
-        ctx.shadowColor = gate.color;
-        ctx.shadowBlur = 18 * p;
-
-        const radius = Math.max(6, 16 * p);
+        // Gate Token Chassis
+        ctx.fillStyle = '#0f1d38';
         ctx.beginPath();
-        ctx.roundRect(x - gateWidth / 2, gateY, gateWidth, gateHeight, radius);
+        ctx.roundRect(-46, -24, 92, 48, 10);
         ctx.fill();
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
         ctx.stroke();
 
-        // Top Glowing LED Indicator
-        ctx.fillStyle = '#ffffff';
+        // Inner Banner
+        ctx.fillStyle = '#1e3a6a';
         ctx.beginPath();
-        ctx.arc(x, gateY + 8 * p, Math.max(2, 4.5 * p), 0, Math.PI * 2);
+        ctx.roundRect(-40, -18, 80, 36, 6);
         ctx.fill();
 
-        // Bold Crisp Number Typography
-        ctx.shadowBlur = 8 * p;
-        ctx.fillStyle = '#ffffff';
-        const fontSize = Math.max(14, Math.floor(32 * p + 8));
-        ctx.font = `900 ${fontSize}px "Outfit", "Fredoka", sans-serif`;
+        // Answer Digits
+        ctx.fillStyle = '#fcd34d';
+        ctx.font = "900 22px 'JetBrains Mono', monospace";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(gate.value, x, gateY + gateHeight * 0.55);
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(opt.value, 0, 1);
 
         ctx.restore();
       });
     }
 
-    renderCharacter(w, h) {
-      const ctx = this.ctx;
-      const horizonY = h * this.horizonRatio;
-      const roadTopWidth = w * 0.16;
-      const roadBottomWidth = w * 0.88;
-      const roadCenterX = w * 0.5;
-
-      const p = 0.86;
-      const baseY = horizonY + p * (h - horizonY);
-      const currentRoadWidth = roadTopWidth + p * (roadBottomWidth - roadTopWidth);
-      const laneWidth = currentRoadWidth / 3;
-
-      const charX = roadCenterX + (this.playerCurrentLaneX - 1) * laneWidth;
-      const jumpOffset = this.playerJumpY;
-      const charY = baseY - jumpOffset;
-
-      const tilt = (this.playerLane - this.playerCurrentLaneX) * 0.14; // Dynamic body lean into turns
-
+    // 3. Render Hurdles
+    obstacles.forEach(obs => {
+      const obsX = getLaneCenterX(obs.lane);
       ctx.save();
-      ctx.translate(charX, charY);
-      ctx.rotate(tilt);
+      ctx.translate(obsX, obs.y);
 
-      // Stumble Shake when hitting wrong gate
-      if (this.stumbleTimer > 0) {
-        ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6);
-      }
-
-      // 1. Soft Ground Drop Shadow
-      ctx.fillStyle = 'rgba(21, 34, 52, 0.45)';
-      ctx.beginPath();
-      const shadowW = Math.max(12, 34 - jumpOffset * 0.25);
-      ctx.ellipse(0, 18 + jumpOffset * 0.15, shadowW, shadowW * 0.38, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Running Animation Parameters
-      const runCycle = this.state === 'PLAYING' ? this.runFrame : 0;
-      const legSwing = Math.sin(runCycle);
-      const armSwing = Math.cos(runCycle);
-      const bounce = this.isJumping ? -14 : -Math.abs(Math.sin(runCycle)) * 6;
-      const bodyY = bounce - 10;
-
-      // Color Palette for Human Kid Runner
-      const skinColor = '#fbcfe8';       // Fair skin
-      const skinShadow = '#f472b6';
-      const hairColor = '#78350f';       // Brown hair
-      const capColor = '#ef4444';        // Red backwards cap
-      const capBrim = '#dc2626';
-      const shirtColor = '#2563eb';      // Blue runner jersey
-      const shirtTrim = '#f59e0b';       // Gold trim
-      const shortsColor = '#1e293b';     // Navy running shorts
-      const shoeColor = '#e11d48';       // Red sneakers
-      const shoeSole = '#ffffff';        // White chunky sole
-      const outlineColor = '#152234';    // Dark navy outline
-
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-
-      // ======================================================================
-      // 2. LEGS & SNEAKERS (Animated running stride)
-      // ======================================================================
-      const legLength = 22;
-      
-      // LEFT LEG & SHOE
-      const leftLegAngle = this.isJumping ? -0.4 : legSwing * 0.7;
-      const leftFootLift = this.isJumping ? -10 : Math.max(0, -legSwing * 14);
-      const leftKneeX = -10 + leftLegAngle * 8;
-      const leftKneeY = bodyY + 22;
-      const leftFootX = -12 + leftLegAngle * 14;
-      const leftFootY = bodyY + 34 - leftFootLift;
-
-      // Left Leg
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(-8, bodyY + 16);
-      ctx.lineTo(leftKneeX, leftKneeY);
-      ctx.lineTo(leftFootX, leftFootY);
-      ctx.stroke();
-
-      ctx.strokeStyle = skinColor;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(-8, bodyY + 16);
-      ctx.lineTo(leftKneeX, leftKneeY);
-      ctx.lineTo(leftFootX, leftFootY);
-      ctx.stroke();
-
-      // Left Sneaker
-      ctx.fillStyle = shoeColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.roundRect(leftFootX - 7, leftFootY - 4, 14, 10, [4, 4, 2, 2]);
-      ctx.fill();
-      ctx.stroke();
-
-      // Left Sneaker Sole
-      ctx.fillStyle = shoeSole;
-      ctx.fillRect(leftFootX - 8, leftFootY + 4, 16, 4);
-      ctx.strokeRect(leftFootX - 8, leftFootY + 4, 16, 4);
-
-      // RIGHT LEG & SHOE
-      const rightLegAngle = this.isJumping ? 0.4 : -legSwing * 0.7;
-      const rightFootLift = this.isJumping ? -10 : Math.max(0, legSwing * 14);
-      const rightKneeX = 10 + rightLegAngle * 8;
-      const rightKneeY = bodyY + 22;
-      const rightFootX = 12 + rightLegAngle * 14;
-      const rightFootY = bodyY + 34 - rightFootLift;
-
-      // Right Leg
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(8, bodyY + 16);
-      ctx.lineTo(rightKneeX, rightKneeY);
-      ctx.lineTo(rightFootX, rightFootY);
-      ctx.stroke();
-
-      ctx.strokeStyle = skinColor;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(8, bodyY + 16);
-      ctx.lineTo(rightKneeX, rightKneeY);
-      ctx.lineTo(rightFootX, rightFootY);
-      ctx.stroke();
-
-      // Right Sneaker
-      ctx.fillStyle = shoeColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.roundRect(rightFootX - 7, rightFootY - 4, 14, 10, [4, 4, 2, 2]);
-      ctx.fill();
-      ctx.stroke();
-
-      // Right Sneaker Sole
-      ctx.fillStyle = shoeSole;
-      ctx.fillRect(rightFootX - 8, rightFootY + 4, 16, 4);
-      ctx.strokeRect(rightFootX - 8, rightFootY + 4, 16, 4);
-
-      // Running Shorts
-      ctx.fillStyle = shortsColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(-15, bodyY + 10, 30, 12, 4);
-      ctx.fill();
-      ctx.stroke();
-
-      // ======================================================================
-      // 3. ARMS (Swinging in opposition to legs)
-      // ======================================================================
-      // LEFT ARM
-      const leftArmAngle = this.isJumping ? -1.2 : -armSwing * 0.6;
-      const leftHandX = -18 + leftArmAngle * 12;
-      const leftHandY = bodyY + 6 - leftArmAngle * 10;
-
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(-12, bodyY - 4);
-      ctx.lineTo(-16, bodyY + 2);
-      ctx.lineTo(leftHandX, leftHandY);
-      ctx.stroke();
-
-      ctx.strokeStyle = shirtColor;
-      ctx.lineWidth = 4.5;
-      ctx.beginPath();
-      ctx.moveTo(-12, bodyY - 4);
-      ctx.lineTo(-16, bodyY + 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = skinColor;
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(-16, bodyY + 2);
-      ctx.lineTo(leftHandX, leftHandY);
-      ctx.stroke();
-
-      // Left Hand Fist
-      ctx.fillStyle = skinColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(leftHandX, leftHandY, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // RIGHT ARM
-      const rightArmAngle = this.isJumping ? 1.2 : armSwing * 0.6;
-      const rightHandX = 18 + rightArmAngle * 12;
-      const rightHandY = bodyY + 6 + rightArmAngle * 10;
-
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(12, bodyY - 4);
-      ctx.lineTo(16, bodyY + 2);
-      ctx.lineTo(rightHandX, rightHandY);
-      ctx.stroke();
-
-      ctx.strokeStyle = shirtColor;
-      ctx.lineWidth = 4.5;
-      ctx.beginPath();
-      ctx.moveTo(12, bodyY - 4);
-      ctx.lineTo(16, bodyY + 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = skinColor;
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(16, bodyY + 2);
-      ctx.lineTo(rightHandX, rightHandY);
-      ctx.stroke();
-
-      // Right Hand Fist
-      ctx.fillStyle = skinColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(rightHandX, rightHandY, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // ======================================================================
-      // 4. TORSO & EXPLORER BACKPACK
-      // ======================================================================
-      // Runner Jersey Body
-      ctx.fillStyle = shirtColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.roundRect(-14, bodyY - 10, 28, 22, 6);
-      ctx.fill();
-      ctx.stroke();
-
-      // Yellow Explorer Backpack on Back
-      ctx.fillStyle = shirtTrim;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(-10, bodyY - 8, 20, 16, 5);
-      ctx.fill();
-      ctx.stroke();
-
-      // Backpack Zip Pocket
-      ctx.fillStyle = '#d97706';
-      ctx.fillRect(-7, bodyY - 4, 14, 8);
-      ctx.strokeRect(-7, bodyY - 4, 14, 8);
-
-      // Star / Number 3 badge on backpack
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(-32, -14, 64, 16);
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 10px "Fredoka", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('★', 0, bodyY);
-
-      // ======================================================================
-      // 5. HEAD & BACKWARDS RUNNER CAP
-      // ======================================================================
-      const headY = bodyY - 22;
-
-      // Ears
-      ctx.fillStyle = skinColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(-13, headY + 2, 3.5, 0, Math.PI * 2);
-      ctx.arc(13, headY + 2, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Head Base (Hair visible at nape of neck)
-      ctx.fillStyle = hairColor;
-      ctx.strokeStyle = outlineColor;
+      ctx.fillRect(-18, -14, 12, 16);
+      ctx.fillRect(8, -14, 12, 16);
+      ctx.strokeStyle = '#991b1b';
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, headY, 13, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      ctx.strokeRect(-32, -14, 64, 16);
 
-      // Red Backwards Cap
-      ctx.fillStyle = capColor;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, headY - 2, 12.5, Math.PI * 0.9, Math.PI * 2.1, false);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Cap Back Strap / Hole
-      ctx.fillStyle = skinColor;
-      ctx.beginPath();
-      ctx.arc(0, headY + 5, 4, Math.PI, Math.PI * 2);
-      ctx.fill();
-
-      // Cap Curved Backwards Brim
-      ctx.fillStyle = capBrim;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(0, headY + 6, 11, 4.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-26, 2, 6, 16);
+      ctx.fillRect(20, 2, 6, 16);
 
       ctx.restore();
+    });
+
+    // 4. Render Athletic Runner Character
+    ctx.save();
+    const wobble = runner.stumbleTimer > 0 ? (Math.random() - 0.5) * 8 : 0;
+    ctx.translate(runner.x + wobble, runner.y + runner.jumpY);
+
+    // Shadow
+    ctx.beginPath();
+    ctx.ellipse(0, 18 - runner.jumpY * 0.35, 24, 7, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+    ctx.fill();
+
+    const step = Math.sin(runner.runAnimFrame * Math.PI);
+    const armSwing = step * 9;
+    const legSwing = step * 11;
+
+    // Back arm
+    ctx.save();
+    ctx.rotate(-0.28 + armSwing * 0.018);
+    ctx.strokeStyle = '#f2b88f';
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-11, -14); ctx.lineTo(-20, 0); ctx.stroke();
+    ctx.restore();
+
+    // Legs
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-6, 3); ctx.lineTo(-11 - legSwing * 0.35, 19); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(6, 3); ctx.lineTo(11 + legSwing * 0.35, 19); ctx.stroke();
+    
+    // Sneakers
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(-11 - legSwing * 0.35, 19); ctx.lineTo(-19 - legSwing * 0.35, 19); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(11 + legSwing * 0.35, 19); ctx.lineTo(19 + legSwing * 0.35, 19); ctx.stroke();
+
+    // Torso (Sport jersey with #4)
+    ctx.fillStyle = '#2563eb';
+    ctx.beginPath();
+    ctx.roundRect(-14, -25, 28, 31, 8);
+    ctx.fill();
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath(); ctx.roundRect(-7, -19, 14, 15, 4); ctx.fill();
+    ctx.fillStyle = '#0f172a';
+    ctx.font = "900 11px 'Fredoka', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('4', 0, -11);
+
+    // Front arm
+    ctx.save();
+    ctx.rotate(0.22 - armSwing * 0.018);
+    ctx.strokeStyle = '#f2b88f';
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(11, -14); ctx.lineTo(20, -1); ctx.stroke();
+    ctx.restore();
+
+    // Head
+    ctx.fillStyle = '#f2b88f';
+    ctx.beginPath(); ctx.arc(0, -39, 15, 0, Math.PI * 2); ctx.fill();
+
+    // Hair
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath(); ctx.arc(0, -43, 15, Math.PI, Math.PI * 2); ctx.fill();
+
+    // Headband
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(-14, -46, 28, 4);
+
+    // Face
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath(); ctx.arc(-5, -39, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(5, -39, 1.8, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+
+    // 5. Render Particles
+    particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // 6. Render Floating Texts
+    floatingTexts.forEach(ft => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, ft.alpha);
+      ctx.fillStyle = ft.color;
+      ctx.font = "900 20px 'Fredoka', cursive, sans-serif";
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+      ctx.shadowBlur = 6;
+      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.restore();
+    });
+
+    ctx.restore();
+  }
+
+  function gameLoop() {
+    update();
+    render();
+    if (isPlaying) {
+      animationFrameId = requestAnimationFrame(gameLoop);
+    }
+  }
+
+  // ==========================================================================
+  // 8. START & END GAME
+  // ==========================================================================
+  function startGame() {
+    currentStageIdx = 0;
+    currentLane = 1;
+    score = 0;
+    lives = 3;
+    combo = 1;
+    bestCombo = 1;
+    totalStagesCleared = 0;
+    totalAttempts = 0;
+    timeRemaining = 90;
+    activeGate = null;
+    obstacles = [];
+    particles = [];
+    floatingTexts = [];
+    isPlaying = true;
+    isGameOver = false;
+    gameStartTime = Date.now();
+
+    targetRunnerX = getLaneCenterX(currentLane);
+    runner.x = targetRunnerX;
+
+    setScreen(null);
+    updateBillboard();
+    startRunnerBGM();
+
+    if (gameTimerInterval) clearInterval(gameTimerInterval);
+    gameTimerInterval = setInterval(() => {
+      if (!isPlaying || isGameOver) return;
+      timeRemaining--;
+      updateHUD();
+      if (timeRemaining <= 0) {
+        endGame(totalStagesCleared >= 6);
+      }
+    }, 1000);
+
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(gameLoop);
+  }
+
+  function startCountdown() {
+    initAudio();
+    setScreen('countdown-screen');
+    let count = 3;
+    const numEl = doc.getElementById('countdown-number');
+    if (numEl) numEl.textContent = count;
+    beep(440, 100, 'sine', 0.15);
+
+    const interval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        if (numEl) numEl.textContent = count;
+        beep(440, 100, 'sine', 0.15);
+      } else {
+        clearInterval(interval);
+        beep(880, 250, 'sine', 0.2);
+        startGame();
+      }
+    }, 750);
+  }
+
+  function endGame(isVictory) {
+    isPlaying = false;
+    isGameOver = true;
+    stopRunnerBGM();
+    if (gameTimerInterval) clearInterval(gameTimerInterval);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    const totalTimeTaken = Math.round((Date.now() - gameStartTime) / 1000);
+    const accuracy = totalAttempts > 0 ? Math.round((totalStagesCleared / Math.max(1, totalAttempts)) * 100) : 100;
+
+    let stars = 1;
+    if (score >= 600 && lives >= 2) stars = 3;
+    else if (score >= 300) stars = 2;
+
+    localStorage.setItem('math_runner_stars', stars);
+
+    if (isVictory) {
+      playCorrectFanfare();
+    } else {
+      playHurdleHitSound();
     }
 
-    renderFX(w, h) {
-      const ctx = this.ctx;
+    const badgeEl = doc.getElementById('game-over-badge');
+    const titleEl = doc.getElementById('game-over-title');
+    const scoreEl = doc.getElementById('final-score');
+    const roundsEl = doc.getElementById('final-rounds');
+    const accuracyEl = doc.getElementById('final-accuracy');
+    const comboEl = doc.getElementById('final-combo');
+    const timeEl = doc.getElementById('final-time');
+    const starsContainer = doc.getElementById('stars-container');
 
-      // Particles
-      this.particles.forEach(p => {
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, p.alpha);
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      });
+    if (badgeEl) badgeEl.textContent = isVictory ? 'STADIUM SPRINT CHAMPION!' : 'SPRINT FINISHED';
+    if (titleEl) titleEl.textContent = isVictory ? 'STADIUM CHAMPION!' : 'GREAT SPRINT!';
+    if (scoreEl) scoreEl.textContent = String(score).padStart(6, '0');
+    if (roundsEl) roundsEl.textContent = `${String(Math.min(10, currentStageIdx + (isVictory ? 1 : 0))).padStart(2, '0')} / 10`;
+    if (accuracyEl) accuracyEl.textContent = `${accuracy}%`;
+    if (comboEl) comboEl.textContent = `${bestCombo}x`;
+    if (timeEl) timeEl.textContent = `${totalTimeTaken}s`;
 
-      // Floating Numbers / Emojis
-      this.floatingTexts.forEach(ft => {
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, ft.alpha);
-        ctx.fillStyle = ft.color;
-        ctx.font = '900 24px "Outfit", "Fredoka", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-        ctx.shadowBlur = 8;
-        ctx.fillText(ft.text, ft.x, ft.y);
-        ctx.restore();
+    if (starsContainer) {
+      let starsHtml = '';
+      for (let s = 1; s <= 3; s++) {
+        const active = s <= stars ? 'star-active' : '';
+        starsHtml += `<span class="arcade-star ${active}"><svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>`;
+      }
+      starsContainer.innerHTML = starsHtml;
+    }
+
+    setScreen('game-over-screen');
+
+    // StuCent Reporting Contract
+    if (gameCtx && typeof gameCtx.end === 'function') {
+      const targetMax = (gameCtx.config && gameCtx.config.maxPoints) || 100;
+      const normalizedScore = Math.min(targetMax, Math.round((score / 1000) * targetMax));
+      gameCtx.end({
+        score: normalizedScore,
+        maxScore: targetMax,
+        timeTaken: totalTimeTaken,
+        success: isVictory || normalizedScore >= 50
       });
     }
   }
 
   // ==========================================================================
-  // INITIALIZE ON DOM CONTENT LOADED
+  // 9. CONTROLS & RESIZING
   // ==========================================================================
-  window.addEventListener('DOMContentLoaded', () => {
-    window.mathRunnerGame = new MathRunnerGame();
-  });
+  function resizeCanvas() {
+    const container = doc.getElementById('canvas-viewport');
+    if (!container || !canvas) return;
+
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width || window.innerWidth;
+    canvas.height = rect.height || (window.innerHeight - 180);
+
+    targetRunnerX = getLaneCenterX(currentLane);
+    runner.x = targetRunnerX;
+    runner.y = canvas.height - 110;
+  }
+
+  function setupControls() {
+    window.addEventListener('resize', resizeCanvas);
+
+    // Keyboard Controls
+    window.addEventListener('keydown', (e) => {
+      if (!isPlaying || isGameOver) return;
+
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        switchLane(currentLane - 1);
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        switchLane(currentLane + 1);
+      } else if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        jump();
+      }
+    });
+
+    // Touch Controls
+    const btnLeft = doc.getElementById('btn-left');
+    const btnRight = doc.getElementById('btn-right');
+    const btnJump = doc.getElementById('btn-jump');
+
+    if (btnLeft) btnLeft.addEventListener('pointerdown', () => switchLane(currentLane - 1));
+    if (btnRight) btnRight.addEventListener('pointerdown', () => switchLane(currentLane + 1));
+    if (btnJump) btnJump.addEventListener('pointerdown', () => jump());
+
+    if (canvas) {
+      canvas.addEventListener('pointerdown', (e) => {
+        if (!isPlaying || isGameOver) return;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX - rect.left;
+        const clientY = e.clientY - rect.top;
+
+        if (clientY < canvas.height * 0.5) {
+          jump();
+        } else {
+          const roadLeft = canvas.width * 0.18;
+          const roadWidth = canvas.width * 0.64;
+          const laneWidth = roadWidth / 3;
+
+          if (clientX < roadLeft + laneWidth) {
+            switchLane(0);
+          } else if (clientX > roadLeft + laneWidth * 2) {
+            switchLane(2);
+          } else {
+            switchLane(1);
+          }
+        }
+      });
+    }
+
+    // Modal Buttons
+    const startBtn = doc.getElementById('start-game-btn');
+    const howToBtn = doc.getElementById('how-to-play-btn');
+    const hudRulesBtn = doc.getElementById('hud-how-to-play-btn');
+    const closeInstBtn = doc.getElementById('close-instructions-btn');
+    const startFromInstBtn = doc.getElementById('start-from-instructions-btn');
+    const playAgainBtn = doc.getElementById('play-again-btn');
+    const soundBtn = doc.getElementById('sound-toggle-btn');
+
+    if (startBtn) startBtn.addEventListener('click', startCountdown);
+    if (howToBtn) howToBtn.addEventListener('click', () => setScreen('instructions-modal'));
+    if (hudRulesBtn) hudRulesBtn.addEventListener('click', () => setScreen('instructions-modal'));
+    if (closeInstBtn) closeInstBtn.addEventListener('click', () => setScreen('start-screen'));
+    if (startFromInstBtn) startFromInstBtn.addEventListener('click', startCountdown);
+    if (playAgainBtn) playAgainBtn.addEventListener('click', startCountdown);
+
+    if (soundBtn) {
+      soundBtn.addEventListener('click', () => {
+        isMuted = !isMuted;
+        localStorage.setItem('math_games_sound', isMuted ? 'false' : 'true');
+        if (isMuted) {
+          stopRunnerBGM();
+        } else if (isPlaying && !isGameOver) {
+          startRunnerBGM();
+        }
+      });
+    }
+  }
+
+  // ==========================================================================
+  // 10. STUCENT INIT & BOOTSTRAP
+  // ==========================================================================
+  window.game = window.game || {};
+  window.game.init = function (config) {
+    window.game.config = config || {};
+  };
+
+  function init() {
+    resizeCanvas();
+    setupControls();
+  }
+
+  if (doc.readyState === 'loading') {
+    doc.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
 })();

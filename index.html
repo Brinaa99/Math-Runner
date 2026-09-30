@@ -3,225 +3,203 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Math Runner - Standard 3 Math Games</title>
-  <meta name="description" content="Sprint across 3 lanes, solve addition and subtraction challenges up to 1,000, and become the ultimate Math Runner!">
+  <title>Math Runner — Athletic Math Sprint</title>
+  <meta name="description" content="Sprint along the 3-lane athletic track, solve math questions and leap hurdles in a retro arcade runner.">
+
+  <!-- Shared Arcade Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="shared.css?v=retro2">
-  <link rel="stylesheet" href="style.css?v=retro2">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700;800;900&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@700;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="game-app">
-    <!-- Main Game Wrapper -->
     <div id="game-container">
       
-      <!-- Top Arcade HUD -->
+      <!-- TOP RETRO ARCADE HUD -->
       <header id="game-hud" class="hud-panel">
-        <div class="hud-item hud-score">
-          <div class="hud-info">
+        <div class="hud-group-left">
+          <div class="hud-box">
             <span class="hud-label">SCORE</span>
-            <span id="score-display" class="hud-value">0</span>
+            <span id="score-display" class="hud-value hud-mono">000000</span>
           </div>
-        </div>
 
-        <div class="hud-item hud-lives">
-          <div class="hud-info">
+          <div class="hud-box">
             <span class="hud-label">LIVES</span>
-            <div id="lives-container" class="lives-hearts" aria-label="3 lives remaining">
-              <span class="heart active">❤️</span>
-              <span class="heart active">❤️</span>
-              <span class="heart active">❤️</span>
+            <div id="lives-container" class="lives-container" aria-label="3 lives remaining">
+              <span class="arcade-heart heart-full"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="arcade-heart heart-full"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
+              <span class="arcade-heart heart-full"><svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></span>
             </div>
           </div>
         </div>
 
-        <div class="hud-item hud-timer">
-          <div class="hud-info">
+        <div class="hud-group-center">
+          <div class="hud-box">
             <span class="hud-label">TIME</span>
-            <span id="timer-display" class="hud-value">60s</span>
+            <span id="timer-display" class="hud-value hud-mono">090</span>
+          </div>
+          <div class="hud-box">
+            <span class="hud-label">STAGE</span>
+            <span id="round-display" class="hud-value hud-mono">01 / 10</span>
+          </div>
+          <div class="hud-box">
+            <span class="hud-label">STREAK</span>
+            <span id="combo-display" class="hud-value combo-accent font-mono">1x</span>
           </div>
         </div>
 
-        <div class="hud-item hud-challenge">
-          <div class="hud-info">
-            <span class="hud-label">CHALLENGE</span>
-            <span id="challenge-display" class="hud-value">1/10</span>
-          </div>
-        </div>
-
-        <div class="hud-nav-actions">
-          <button id="profile-btn" class="hud-btn btn-profile" title="Explorer Profile" aria-label="Explorer Profile">
-            Profile
+        <div class="hud-group-right">
+          <button id="hud-how-to-play-btn" class="hud-icon-btn" title="How to Play" aria-label="How to Play">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm1.07-7.75l-.9.92C12.45 11.9 12 12.5 12 14h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
           </button>
-          <button id="hud-how-to-play-btn" class="hud-btn" title="How to Play" aria-label="How to Play">
-            Rules
+          <button id="sound-toggle-btn" class="hud-icon-btn" title="Toggle Sound" aria-label="Toggle Sound">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
           </button>
-          <button id="sound-toggle-btn" class="hud-btn" title="Toggle Sound" aria-label="Toggle Sound">
-            <span id="sound-icon">Sound</span>
-          </button>
-          <a href="index.html" class="hud-btn" title="Back to Numberland" aria-label="Back to Numberland">
-            Home
-          </a>
         </div>
       </header>
 
-      <!-- Question Billboard Overlay -->
-      <div id="question-billboard" class="question-card">
-        <div class="question-badge">SOLVE THE EQUATION</div>
-        <div id="question-text" class="question-math">320 + 150 = ?</div>
-        <div class="question-hint">Sprint into the lane with the right answer!</div>
-      </div>
+      <!-- ACTIVE MATHEMATICS QUESTION BILLBOARD -->
+      <section id="question-billboard" class="arcade-billboard">
+        <div class="billboard-top-row">
+          <span id="question-badge" class="billboard-badge">STAGE 01 • ADDITION</span>
+          <span id="question-hint-pill" class="billboard-quota">SPRINT INTO CORRECT ANSWER GATE</span>
+        </div>
+        <div id="question-prompt" class="billboard-main-text">320 + 150 = ?</div>
+        <div id="question-tip" class="billboard-sub-text">Add hundreds first (300+100=400), then tens (20+50=70). Steer to the correct lane!</div>
+      </section>
 
-      <!-- Canvas for 2.5D Runner Graphics -->
-      <div class="canvas-viewport">
-        <canvas id="game-canvas" width="800" height="600"></canvas>
-      </div>
+      <!-- FULLSCREEN 2.5D RUNNER CANVAS VIEWPORT -->
+      <main class="canvas-viewport" id="canvas-viewport">
+        <canvas id="game-canvas"></canvas>
+      </main>
 
-      <!-- Mobile Touch Controls -->
-      <div id="mobile-controls" class="mobile-touch-bar">
-        <button id="btn-left" class="arcade-touch-btn" aria-label="Move Left">
-          <span class="touch-icon">◀</span>
-          <span class="touch-text">LEFT</span>
-        </button>
-        <div class="mobile-hint">SWIPE OR TAP TO SWITCH LANES</div>
-        <button id="btn-right" class="arcade-touch-btn" aria-label="Move Right">
-          <span class="touch-text">RIGHT</span>
-          <span class="touch-icon">▶</span>
-        </button>
-      </div>
+      <!-- ON-SCREEN MOBILE TOUCH CONTROLS -->
+      <footer class="mobile-touch-bar" aria-label="Runner Controls">
+        <button id="btn-left" class="touch-btn" aria-label="Sprint Left">SPRINT LEFT</button>
+        <button id="btn-jump" class="touch-btn btn-jump-main" aria-label="Jump Obstacle">JUMP!</button>
+        <button id="btn-right" class="touch-btn" aria-label="Sprint Right">SPRINT RIGHT</button>
+      </footer>
+
+      <!-- MICRO-EXPLANATION HINT TOAST -->
+      <aside id="hint-banner" class="arcade-toast hidden" role="alert">
+        <div class="toast-accent-bar"></div>
+        <div class="toast-body">
+          <div class="toast-title">MATH COACH HINT</div>
+          <div id="hint-text" class="toast-text">Add hundreds first (300+100=400), then tens (20+50=70) = 470</div>
+        </div>
+      </aside>
 
       <!-- START SCREEN OVERLAY -->
       <div id="start-screen" class="overlay-screen active">
-        <div class="overlay-card start-card">
-          <div class="game-logo-wrapper">
-            <div class="logo-badge">STANDARD 3 MATH</div>
-            <h1 class="game-title">MATH<span class="title-highlight">RUNNER</span></h1>
-            <p class="game-subtitle">Sprint across lanes, dodge wrong numbers, and collect the correct answers!</p>
+        <div class="arcade-modal">
+          <div class="modal-arcade-header">
+            <span class="arcade-badge badge-gold">STADIUM SPRINT ARENA</span>
           </div>
+          
+          <h1 class="arcade-title">MATH<span class="title-pop">RUNNER</span></h1>
+          <div class="arcade-subtitle-pill">3-LANE ATHLETIC SPRINT</div>
+          
+          <p class="arcade-desc">Sprint along the 3-lane track! Solve math questions, switch lanes to run through the correct answer gate, and leap over red hurdles!</p>
 
-          <div class="character-preview">
-            <div class="preview-bubbles">
-              <span class="chip">Addition</span>
-              <span class="chip">Subtraction</span>
-              <span class="chip">Up to 1,000</span>
-            </div>
+          <div class="arcade-actions">
+            <button id="start-game-btn" class="arcade-btn btn-primary">START RUNNING</button>
+            <button id="how-to-play-btn" class="arcade-btn btn-secondary">HOW TO PLAY</button>
           </div>
+        </div>
+      </div>
 
-          <div class="action-buttons">
-            <button id="start-game-btn" class="arcade-btn btn-play">
-              START GAME
-            </button>
-            <button id="how-to-play-btn" class="arcade-btn btn-secondary">
-              HOW TO PLAY
-            </button>
-          </div>
-
-          <div class="quick-settings">
-            <button id="start-sound-toggle" class="chip-btn">
-              MUSIC &amp; SFX: <span id="start-sound-text">ON</span>
-            </button>
-          </div>
+      <!-- COUNTDOWN SCREEN -->
+      <div id="countdown-screen" class="overlay-screen hidden">
+        <div class="countdown-modal">
+          <div id="countdown-number" class="countdown-number">3</div>
+          <div class="countdown-label">ON YOUR MARK... GET SET!</div>
         </div>
       </div>
 
       <!-- HOW TO PLAY MODAL -->
       <div id="instructions-modal" class="overlay-screen hidden">
-        <div class="overlay-card modal-card">
-          <div class="modal-header">
-            <h2>HOW TO PLAY</h2>
-            <button id="close-instructions-btn" class="close-btn" aria-label="Close instructions">✕</button>
+        <div class="arcade-modal instructions-modal">
+          <div class="modal-arcade-header">
+            <span class="arcade-badge">RUNNER GUIDE</span>
           </div>
+          
+          <h2 class="modal-heading">HOW TO SPRINT &amp; SOLVE</h2>
 
-          <div class="instructions-grid">
-            <div class="instruction-box">
-              <div class="inst-icon">01</div>
-              <div class="inst-content">
-                <h3>Switch Lanes</h3>
-                <p>Use <strong>Left / Right Arrows</strong> or <strong>A / D</strong> keys (or on-screen buttons) to sprint across 3 lanes.</p>
-              </div>
+          <div class="instruction-cards-grid">
+            <div class="inst-card">
+              <div class="inst-step-num">1</div>
+              <div class="inst-card-title">READ QUESTION</div>
+              <p>Check the equation on the top billboard (e.g. <em>320 + 150 = ?</em>).</p>
             </div>
-
-            <div class="instruction-box">
-              <div class="inst-icon">02</div>
-              <div class="inst-content">
-                <h3>Collect Correct Answers</h3>
-                <p>Read the math equation at the top and steer into the lane with the matching answer for <strong>+100 points</strong>!</p>
-              </div>
+            <div class="inst-card">
+              <div class="inst-step-num">2</div>
+              <div class="inst-card-title">SWITCH LANES</div>
+              <p>Use Left/Right arrows, A/D, or tap buttons to enter the lane with the correct answer.</p>
             </div>
-
-            <div class="instruction-box">
-              <div class="inst-icon">03</div>
-              <div class="inst-content">
-                <h3>Protect Your Lives</h3>
-                <p>Hitting a wrong answer costs you <strong>1 life</strong>. You have <strong>3 lives</strong> total.</p>
-              </div>
-            </div>
-
-            <div class="instruction-box">
-              <div class="inst-icon">04</div>
-              <div class="inst-content">
-                <h3>Earn 3 Stars</h3>
-                <p>Clear all 10 challenges before the <strong>60s timer</strong> ends to unlock gold stars for your Explorer Profile!</p>
-              </div>
+            <div class="inst-card">
+              <div class="inst-step-num">3</div>
+              <div class="inst-card-title">LEAP HURDLES</div>
+              <p>Press Space or tap Jump to leap over red hurdles and keep your streak multiplier!</p>
             </div>
           </div>
 
-          <button id="start-from-instructions-btn" class="arcade-btn btn-play modal-play-btn">
-            LET'S RUN!
-          </button>
-        </div>
-      </div>
-
-      <!-- END SCREEN OVERLAY (Game Over / Victory) -->
-      <div id="end-screen" class="overlay-screen hidden">
-        <div class="overlay-card end-card">
-          <div id="end-header-badge" class="result-badge victory">VICTORY!</div>
-          <h2 id="end-title" class="end-title">RUN COMPLETED!</h2>
-          <p id="end-subtitle" class="end-subtitle">Amazing sprint math champion!</p>
-
-          <div class="stars-awarded" id="stars-container">
-            <span class="star-slot" data-star="1">★</span>
-            <span class="star-slot" data-star="2">★</span>
-            <span class="star-slot" data-star="3">★</span>
-          </div>
-
-          <div class="score-summary-grid">
-            <div class="summary-box">
-              <span class="summary-label">FINAL SCORE</span>
-              <span id="final-score-val" class="summary-val highlight">1000</span>
-            </div>
-            <div class="summary-box">
-              <span class="summary-label">CHALLENGES</span>
-              <span id="final-challenges-val" class="summary-val">10 / 10</span>
-            </div>
-            <div class="summary-box">
-              <span class="summary-label">LIVES LEFT</span>
-              <span id="final-lives-val" class="summary-val">3 / 3</span>
-            </div>
-            <div class="summary-box">
-              <span class="summary-label">TIME LEFT</span>
-              <span id="final-time-val" class="summary-val">35s</span>
-            </div>
-          </div>
-
-          <div class="end-actions">
-            <button id="play-again-btn" class="arcade-btn btn-play">
-              PLAY AGAIN
-            </button>
-            <a href="index.html" class="arcade-btn btn-home" id="back-home-btn">
-              BACK TO NUMBERLAND
-            </a>
+          <div class="arcade-actions">
+            <button id="close-instructions-btn" class="arcade-btn btn-secondary">BACK</button>
+            <button id="start-from-instructions-btn" class="arcade-btn btn-primary">RUN NOW</button>
           </div>
         </div>
       </div>
 
-      <!-- Floating Feedbacks and Popups -->
-      <div id="feedback-banner" class="feedback-toast"></div>
+      <!-- GAME OVER / REWARD SCREEN -->
+      <div id="game-over-screen" class="overlay-screen hidden">
+        <div class="arcade-modal">
+          <div class="modal-arcade-header">
+            <span id="game-over-badge" class="arcade-badge badge-gold">SPRINT COMPLETE</span>
+          </div>
+
+          <h2 id="game-over-title" class="arcade-title title-sm">STADIUM CHAMPION!</h2>
+
+          <!-- Star Ratings (Pure SVG) -->
+          <div class="stars-display-row" id="stars-container">
+            <span class="arcade-star"><svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+            <span class="arcade-star"><svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+            <span class="arcade-star"><svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>
+          </div>
+
+          <div class="stats-scoreboard">
+            <div class="stat-cell">
+              <span class="stat-label">SCORE</span>
+              <span id="final-score" class="stat-value hud-mono">000000</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-label">STAGES</span>
+              <span id="final-rounds" class="stat-value hud-mono">10 / 10</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-label">ACCURACY</span>
+              <span id="final-accuracy" class="stat-value hud-mono">100%</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-label">BEST STREAK</span>
+              <span id="final-combo" class="stat-value hud-mono">1x</span>
+            </div>
+            <div class="stat-cell">
+              <span class="stat-label">TIME</span>
+              <span id="final-time" class="stat-value hud-mono">0s</span>
+            </div>
+          </div>
+
+          <div class="arcade-actions">
+            <button id="play-again-btn" class="arcade-btn btn-primary">RUN AGAIN</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <script src="shared.js?v=retro2"></script>
-  <script src="game.js?v=humanrunner"></script>
+  <script src="game.js"></script>
 </body>
 </html>
