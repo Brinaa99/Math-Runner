@@ -11,11 +11,53 @@
   const doc = typeof root !== 'undefined' ? root : document;
   const gameCtx = typeof game !== 'undefined' ? game : (window.game || null);
 
-  // ==========================================================================
+  const safeStorage = {
+    getItem(key) {
+      try { return (typeof window !== 'undefined' && window.localStorage) ? window.localStorage.getItem(key) : null; } catch (e) { return null; }
+    },
+    setItem(key, val) {
+      try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.setItem(key, val); } catch (e) {}
+    }
+  };
+
+  function getEl(id) {
+    try {
+      if (doc && typeof doc.getElementById === 'function') {
+        const el = doc.getElementById(id);
+        if (el) return el;
+      }
+      if (doc && typeof doc.querySelector === 'function') {
+        const el = doc.querySelector('#' + id);
+        if (el) return el;
+      }
+    } catch (e) {}
+    try {
+      if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+        return document.getElementById(id);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function queryAll(sel) {
+    try {
+      if (doc && typeof doc.querySelectorAll === 'function') {
+        const res = doc.querySelectorAll(sel);
+        if (res && res.length > 0) return res;
+      }
+    } catch (e) {}
+    try {
+      if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+        return document.querySelectorAll(sel);
+      }
+    } catch (e) {}
+    return [];
+  }
+
   // 1. ARCADE SOUND & ATHLETIC PROCEDURAL BGM SYNTHESIZER
   // ==========================================================================
   let audioCtx = null;
-  let isMuted = localStorage.getItem('math_games_sound') === 'false';
+  let isMuted = safeStorage.getItem('math_games_sound') === 'false';
   let bgmMasterGain = null;
   let bgmInterval = null;
   let bgmStep = 0;
@@ -298,8 +340,8 @@
   let floatingTexts = [];
   let trackScrollOffset = 0;
 
-  const canvas = doc.getElementById('game-canvas');
-  const ctx = canvas.getContext('2d');
+  let canvas = null;
+  let ctx = null;
   let animationFrameId = null;
 
   // ==========================================================================
@@ -308,7 +350,7 @@
   function setScreen(screenId) {
     const screens = ['start-screen', 'countdown-screen', 'instructions-modal', 'game-over-screen'];
     screens.forEach(id => {
-      const el = doc.getElementById(id);
+      const el = getEl(id);
       if (el) {
         if (id === screenId) {
           el.classList.remove('hidden');
@@ -322,17 +364,17 @@
   }
 
   function updateHUD() {
-    const scoreEl = doc.getElementById('score-display');
-    const timerEl = doc.getElementById('timer-display');
-    const roundEl = doc.getElementById('round-display');
-    const comboEl = doc.getElementById('combo-display');
+    const scoreEl = getEl('score-display');
+    const timerEl = getEl('timer-display');
+    const roundEl = getEl('round-display');
+    const comboEl = getEl('combo-display');
 
     if (scoreEl) scoreEl.textContent = String(score).padStart(6, '0');
     if (timerEl) timerEl.textContent = String(Math.max(0, timeRemaining)).padStart(3, '0');
     if (roundEl) roundEl.textContent = `${String(currentStageIdx + 1).padStart(2, '0')} / 10`;
     if (comboEl) comboEl.textContent = `${combo}x`;
 
-    const heartsContainer = doc.getElementById('lives-container');
+    const heartsContainer = getEl('lives-container');
     if (heartsContainer) {
       let heartsHtml = '';
       for (let i = 0; i < 3; i++) {
@@ -347,9 +389,9 @@
     const challenge = MATH_CHALLENGES[currentStageIdx];
     if (!challenge) return;
 
-    const badgeEl = doc.getElementById('question-badge');
-    const promptEl = doc.getElementById('question-prompt');
-    const tipEl = doc.getElementById('question-tip');
+    const badgeEl = getEl('question-badge');
+    const promptEl = getEl('question-prompt');
+    const tipEl = getEl('question-tip');
 
     if (badgeEl) badgeEl.textContent = challenge.badge;
     if (promptEl) promptEl.textContent = challenge.question;
@@ -359,8 +401,8 @@
   }
 
   function showHint(text) {
-    const hintBanner = doc.getElementById('hint-banner');
-    const hintText = doc.getElementById('hint-text');
+    const hintBanner = getEl('hint-banner');
+    const hintText = getEl('hint-text');
     if (hintBanner && hintText) {
       hintText.textContent = text;
       hintBanner.classList.remove('hidden');
@@ -935,7 +977,7 @@
     initAudio();
     setScreen('countdown-screen');
     let count = 3;
-    const numEl = doc.getElementById('countdown-number');
+    const numEl = getEl('countdown-number');
     if (numEl) numEl.textContent = count;
     beep(440, 100, 'sine', 0.15);
 
@@ -966,7 +1008,7 @@
     if (score >= 600 && lives >= 2) stars = 3;
     else if (score >= 300) stars = 2;
 
-    localStorage.setItem('math_runner_stars', stars);
+    safeStorage.setItem('math_runner_stars', stars);
 
     if (isVictory) {
       playCorrectFanfare();
@@ -974,14 +1016,14 @@
       playHurdleHitSound();
     }
 
-    const badgeEl = doc.getElementById('game-over-badge');
-    const titleEl = doc.getElementById('game-over-title');
-    const scoreEl = doc.getElementById('final-score');
-    const roundsEl = doc.getElementById('final-rounds');
-    const accuracyEl = doc.getElementById('final-accuracy');
-    const comboEl = doc.getElementById('final-combo');
-    const timeEl = doc.getElementById('final-time');
-    const starsContainer = doc.getElementById('stars-container');
+    const badgeEl = getEl('game-over-badge');
+    const titleEl = getEl('game-over-title');
+    const scoreEl = getEl('final-score');
+    const roundsEl = getEl('final-rounds');
+    const accuracyEl = getEl('final-accuracy');
+    const comboEl = getEl('final-combo');
+    const timeEl = getEl('final-time');
+    const starsContainer = getEl('stars-container');
 
     if (badgeEl) badgeEl.textContent = isVictory ? 'STADIUM SPRINT CHAMPION!' : 'SPRINT FINISHED';
     if (titleEl) titleEl.textContent = isVictory ? 'STADIUM CHAMPION!' : 'GREAT SPRINT!';
@@ -1019,7 +1061,11 @@
   // 9. CONTROLS & RESIZING
   // ==========================================================================
   function resizeCanvas() {
-    const container = doc.getElementById('canvas-viewport');
+    if (!canvas) {
+      canvas = getEl('game-canvas');
+      if (canvas) ctx = canvas.getContext('2d');
+    }
+    const container = getEl('canvas-viewport');
     if (!container || !canvas) return;
 
     const rect = container.getBoundingClientRect();
@@ -1049,9 +1095,9 @@
     });
 
     // Touch Controls
-    const btnLeft = doc.getElementById('btn-left');
-    const btnRight = doc.getElementById('btn-right');
-    const btnJump = doc.getElementById('btn-jump');
+    const btnLeft = getEl('btn-left');
+    const btnRight = getEl('btn-right');
+    const btnJump = getEl('btn-jump');
 
     if (btnLeft) btnLeft.addEventListener('pointerdown', () => switchLane(currentLane - 1));
     if (btnRight) btnRight.addEventListener('pointerdown', () => switchLane(currentLane + 1));
@@ -1083,13 +1129,13 @@
     }
 
     // Modal Buttons
-    const startBtn = doc.getElementById('start-game-btn');
-    const howToBtn = doc.getElementById('how-to-play-btn');
-    const hudRulesBtn = doc.getElementById('hud-how-to-play-btn');
-    const closeInstBtn = doc.getElementById('close-instructions-btn');
-    const startFromInstBtn = doc.getElementById('start-from-instructions-btn');
-    const playAgainBtn = doc.getElementById('play-again-btn');
-    const soundBtn = doc.getElementById('sound-toggle-btn');
+    const startBtn = getEl('start-game-btn');
+    const howToBtn = getEl('how-to-play-btn');
+    const hudRulesBtn = getEl('hud-how-to-play-btn');
+    const closeInstBtn = getEl('close-instructions-btn');
+    const startFromInstBtn = getEl('start-from-instructions-btn');
+    const playAgainBtn = getEl('play-again-btn');
+    const soundBtn = getEl('sound-toggle-btn');
 
     if (startBtn) startBtn.addEventListener('click', startCountdown);
     if (howToBtn) howToBtn.addEventListener('click', () => setScreen('instructions-modal'));
@@ -1101,7 +1147,7 @@
     if (soundBtn) {
       soundBtn.addEventListener('click', () => {
         isMuted = !isMuted;
-        localStorage.setItem('math_games_sound', isMuted ? 'false' : 'true');
+        safeStorage.setItem('math_games_sound', isMuted ? 'false' : 'true');
         if (isMuted) {
           stopRunnerBGM();
         } else if (isPlaying && !isGameOver) {
@@ -1120,6 +1166,8 @@
   };
 
   function init() {
+    canvas = getEl('game-canvas');
+    if (canvas) ctx = canvas.getContext('2d');
     resizeCanvas();
     setupControls();
   }
